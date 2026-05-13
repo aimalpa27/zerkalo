@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Зеркало — Метафорические карты</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#FAFAF8;font-family:'Inter',system-ui,sans-serif;color:#1C1814;}
+::-webkit-scrollbar{width:4px;background:#FAFAF8;}
+::-webkit-scrollbar-thumb{background:#C9A84C44;border-radius:2px;}
+input,textarea,select{outline:none;font-family:inherit;}
+button{cursor:pointer;border:none;font-family:inherit;}
+.serif{font-family:'Cormorant Garamond',serif;}
+.fi{animation:fi 0.4s ease both;}
+@keyframes fi{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.hov:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.12)!important;}
+.hov{transition:all 0.25s;}
+a{color:inherit;text-decoration:none;}
+#root{min-height:100vh;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+const {useState}=React;
+const WA=`https://wa.me/77022873154?text=${encodeURIComponent('Здравствуйте! Хочу получить доступ к картам на Зеркало.')}`;
+const DURS=[{id:'month',l:'1 месяц',days:30},{id:'half',l:'6 месяцев',days:180},{id:'year',l:'1 год',days:365}];
+const COLS=['#C9A84C','#4A90D9','#9C6B3C','#7B5EA7','#3D8B6F','#C0603A','#4A7FA5','#8B7355','#5B8A5F','#A0522D','#6B7FA8','#9B6B6B','#4A8B8B','#8B6914','#6B5B8B','#7A8B4A','#8B4A6B','#4A6B8B','#8B7A4A','#5B6B7A'];
+const BGS=['#1a0e00','#080d1a','#120800','#0e0818','#011208','#1a0800','#050f1a','#100c05','#051205','#180800','#080e1a','#160808','#041010','#150e00','#0c081a','#0d1205','#180510','#050c18','#14100a','#080c10'];
+
+const INIT_CARDS=[
+  {id:1,title:'Путь',desc:'Вы на перепутье. Куда ведёт ваш путь? Что вы оставляете позади, и что берёте с собой? Эта карта приглашает осмотреться и почувствовать направление своего движения — не то, которое ожидают от вас, а то, куда тянет по-настоящему. Позвольте себе замереть и прислушаться.',img:'',color:'#C9A84C',bg:'#1a0e00'},
+  {id:2,title:'Сейф',desc:'Сейф — символ скрытых ресурсов и скрытых страхов. Что вы тщательно охраняете? Это ценность, которую боитесь потерять, или убеждение, которое давно пора пересмотреть? Иногда то, что мы прячем, нуждается не в защите, а в свете.',img:'',color:'#4A90D9',bg:'#080d1a'},
+  {id:3,title:'Маска',desc:'Какую роль вы играете в отношениях с деньгами и людьми? Кем притворяетесь — богатым, бедным, безразличным? За какой маской прячется ваше истинное отношение к деньгам и к самому себе? Пришло время снять её.',img:'',color:'#9C6B3C',bg:'#120800'},
+  {id:4,title:'Бремя',desc:'Что стало непосильным грузом? Долги, чужие обязательства, ожидания — эта карта про всё, что давит и мешает идти легко. Что вы готовы наконец положить на землю? Позвольте себе отдохнуть от чужого веса.',img:'',color:'#7B5EA7',bg:'#0e0818'},
+  {id:5,title:'Рассеивание',desc:'Деньги уходят, как вода сквозь пальцы. Что стоит за хаотичным отношением к финансам? Тревога? Неосознанное желание не иметь лишнего? Страх видеть реальное положение дел? Осознание — первый шаг к изменению.',img:'',color:'#3D8B6F',bg:'#011208'},
+  {id:6,title:'Витрина',desc:'Вы смотрите на чужую жизнь снаружи. Зависть, восхищение или вдохновение? Эта карта про отношение к чужому достатку и к тому, чего вы хотите для себя. Что за стеклом отражает ваши собственные желания?',img:'',color:'#C0603A',bg:'#1a0800'},
+  {id:7,title:'Изобилие',desc:'Как вы себя чувствуете, представляя жизнь в достатке? Радость, вина или страх? Позволяете ли себе иметь много, или внутри живёт убеждение, что вы этого не заслуживаете? Изобилие начинается с разрешения.',img:'',color:'#4A7FA5',bg:'#050f1a'},
+  {id:8,title:'Сундук',desc:'Скрытые сокровища. Какие таланты и ресурсы вы не используете? Что ждёт своего часа внутри вас — уникальный навык, смелая идея или право заявить о себе в полный голос? Откройте крышку.',img:'',color:'#8B7355',bg:'#100c05'},
+  {id:9,title:'Одиночество',desc:'Достаток без близости — это пустота. Как деньги влияют на ваши отношения? Делают ли они вас более одинокими или помогают строить настоящую близость и доверие? Что важнее — иметь или принадлежать?',img:'',color:'#5B8A5F',bg:'#051205'},
+  {id:10,title:'Клетка',desc:'В чём вы ощущаете себя в ловушке? Нелюбимая работа, кредиты, чужие ожидания — что держит вас, не давая двигаться туда, куда зовёт душа? Кто держит ключ? Возможно, он всегда был у вас.',img:'',color:'#A0522D',bg:'#180800'},
+];
+const INIT_PROMOS=[{code:'ZERKALO',duration:'month',active:true,used:false}];
+
+// ─── Компонент карты ───
+function CardVis({c,size,onClick}){
+  const w=size==='lg'?148:90,ht=size==='lg'?208:126;
+  return React.createElement('div',{onClick,className:onClick?'hov':'',style:{width:w,height:ht,borderRadius:10,background:c.img?'transparent':`linear-gradient(155deg,${c.bg||'#0a0800'},${c.color}44)`,border:`1px solid ${c.color}33`,cursor:onClick?'pointer':'default',overflow:'hidden',flexShrink:0,boxShadow:`0 3px 14px ${c.color}15`,position:'relative'}},
+    c.img
+      ? [React.createElement('img',{key:'i',src:c.img,style:{width:'100%',height:'100%',objectFit:'cover'},onError:e=>{e.target.style.display='none';}}),
+         React.createElement('div',{key:'o',style:{position:'absolute',bottom:0,left:0,right:0,padding:'20px 8px 8px',background:'linear-gradient(transparent,rgba(0,0,0,0.75))'}}),
+         React.createElement('div',{key:'t',style:{position:'absolute',bottom:8,left:0,right:0,textAlign:'center',fontFamily:"'Cormorant Garamond',serif",fontSize:size==='lg'?12:9.5,color:'#F5EFE0',letterSpacing:'0.08em',textTransform:'uppercase'}},c.title)]
+      : React.createElement('div',{style:{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'space-between',padding:size==='lg'?'16px 10px 14px':'9px 6px 8px'}},
+          React.createElement('div',{style:{fontSize:9,color:c.color,opacity:0.6,letterSpacing:'0.05em'}},'№'+c.id),
+          React.createElement('svg',{width:size==='lg'?50:34,height:size==='lg'?50:34,viewBox:'0 0 40 40'},
+            React.createElement('ellipse',{cx:20,cy:20,rx:17,ry:17,fill:c.color+'14',stroke:c.color+'40',strokeWidth:0.8}),
+            React.createElement('ellipse',{cx:20,cy:20,rx:9,ry:9,fill:c.color+'22',stroke:c.color+'55',strokeWidth:0.5}),
+            React.createElement('circle',{cx:20,cy:20,r:3.5,fill:c.color,opacity:0.9}),
+            React.createElement('line',{x1:20,y1:3,x2:20,y2:8,stroke:c.color,strokeWidth:0.7,opacity:0.4}),
+            React.createElement('line',{x1:20,y1:32,x2:20,y2:37,stroke:c.color,strokeWidth:0.7,opacity:0.4}),
+            React.createElement('line',{x1:3,y1:20,x2:8,y2:20,stroke:c.color,strokeWidth:0.7,opacity:0.4}),
+            React.createElement('line',{x1:32,y1:20,x2:37,y2:20,stroke:c.color,strokeWidth:0.7,opacity:0.4})
+          ),
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:size==='lg'?12:9.5,fontWeight:500,color:'#F0EAD6',textAlign:'center',letterSpacing:'0.08em',textTransform:'uppercase',lineHeight:1.25}},c.title)
+        )
+  );
+}
+
+// ─── Логотип ───
+function Logo({size,light}){
+  const s=size||22,c=light?'rgba(245,239,224,0.9)':'#1C1814',g=light?'rgba(201,168,76,0.9)':'#B8902A';
+  return React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}},
+    React.createElement('svg',{width:s,height:s+4,viewBox:'0 0 24 28',fill:'none'},
+      React.createElement('ellipse',{cx:12,cy:11,rx:9,ry:10,stroke:g,strokeWidth:1.2}),
+      React.createElement('ellipse',{cx:12,cy:11,rx:5,ry:5.5,stroke:g,strokeWidth:0.7,opacity:0.5}),
+      React.createElement('line',{x1:12,y1:21,x2:12,y2:24,stroke:g,strokeWidth:1.2}),
+      React.createElement('line',{x1:8,y1:24,x2:16,y2:24,stroke:g,strokeWidth:1.2})
+    ),
+    React.createElement('span',{className:'serif',style:{fontSize:s,fontWeight:400,color:c,letterSpacing:'0.02em',lineHeight:1}},'Зеркало')
+  );
+}
+
+// ─── Кнопка WhatsApp ───
+function WABtn({label}){
+  return React.createElement('a',{href:WA,target:'_blank',rel:'noreferrer',style:{display:'block'}},
+    React.createElement('button',{style:{width:'100%',background:'#25D366',color:'#fff',padding:'15px',borderRadius:8,fontSize:14,fontWeight:500,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:9}},
+      React.createElement('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'currentColor'},
+        React.createElement('path',{d:'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z'})
+      ),
+      label||'Написать в WhatsApp (+7 702 287 3154)'
+    )
+  );
+}
+
+// ─── Главное приложение ───
+function App(){
+  const [screen,setScreen]=useState('landing');
+  const [cards,setCards]=useState(INIT_CARDS);
+  const [promos,setPromos]=useState(INIT_PROMOS);
+  const [selCard,setSelCard]=useState(null);
+  const [adminTab,setAdminTab]=useState('cards');
+  const [login,setLogin]=useState({email:'',pass:''});
+  const [loginErr,setLoginErr]=useState('');
+  const [newCard,setNewCard]=useState({title:'',desc:'',img:'',color:'#C9A84C'});
+  const [newPromo,setNewPromo]=useState({code:'',dur:'month'});
+  const [editId,setEditId]=useState(null);
+  const [editData,setEditData]=useState({});
+  const [promoInput,setPromoInput]=useState('');
+  const [promoMsg,setPromoMsg]=useState('');
+
+  const gold='#B8902A',muted='#9A8870',bdr='#E4DDD0',wht='#FFFFFF',dk='#1C1814',bg='#FAFAF8';
+  const hdrS={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 24px',borderBottom:`1px solid ${bdr}`,background:wht,position:'sticky',top:0,zIndex:10,boxShadow:'0 1px 8px rgba(0,0,0,0.04)'};
+  const btnP={background:dk,color:bg,padding:'12px 24px',borderRadius:6,fontSize:13,fontWeight:500,border:'none',cursor:'pointer'};
+  const btnG={background:gold,color:'#fff',padding:'12px 24px',borderRadius:6,fontSize:13,fontWeight:500,border:'none',cursor:'pointer'};
+  const btnS={background:'transparent',color:dk,padding:'12px 24px',borderRadius:6,fontSize:13,border:`1px solid ${bdr}`,cursor:'pointer'};
+  const inp={width:'100%',background:wht,border:`1px solid ${bdr}`,borderRadius:6,padding:'11px 13px',color:dk,fontSize:13,marginBottom:10,fontFamily:'inherit'};
+  const tag={fontSize:10,letterSpacing:'0.12em',color:muted,marginBottom:12};
+  const h=React.createElement;
+
+  const doAdminLogin=()=>{
+    if(login.email==='admin@zerkalo.kz'&&login.pass==='admin123'){setScreen('admin');setLoginErr('');}
+    else setLoginErr('Неверный логин или пароль');
+  };
+  const doAddCard=()=>{
+    if(!newCard.title||!newCard.desc)return;
+    const idx=cards.length%COLS.length;
+    setCards(p=>[...p,{id:Date.now(),title:newCard.title,desc:newCard.desc,img:newCard.img,color:COLS[idx],bg:BGS[idx]}]);
+    setNewCard({title:'',desc:'',img:'',color:'#C9A84C'});
+  };
+  const saveEdit=(id)=>{setCards(p=>p.map(c=>c.id===id?{...c,...editData}:c));setEditId(null);};
+  const doAddPromo=()=>{
+    if(!newPromo.code)return;
+    const code=newPromo.code.toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!code||promos.find(p=>p.code===code))return;
+    setPromos(p=>[...p,{code,duration:newPromo.dur,active:true,used:false}]);
+    setNewPromo({code:'',dur:'month'});
+  };
+  const applyPromo=()=>{
+    const p=promos.find(p=>p.code===promoInput.trim().toUpperCase()&&p.active&&!p.used);
+    if(p)setPromoMsg('✓ Промокод принят! Напишите нам в WhatsApp для активации.');
+    else setPromoMsg('Промокод не найден или уже использован');
+  };
+
+  // ══ LANDING ══
+  if(screen==='landing')return h('div',{style:{minHeight:'100vh',background:bg}},
+    h('nav',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 28px',borderBottom:`1px solid ${bdr}`,background:wht}},
+      h('div',{onClick:()=>setScreen('landing')},h(Logo,{size:22})),
+      h('div',{style:{display:'flex',gap:10}},
+        h('button',{style:{...btnS,padding:'9px 18px',fontSize:12},onClick:()=>setScreen('cards')},'Карты'),
+        h('button',{style:{...btnP,padding:'9px 18px',fontSize:12},onClick:()=>setScreen('cards')},'Начать →')
+      )
+    ),
+    h('div',{style:{background:'linear-gradient(160deg,#1C1208 0%,#2A1E10 50%,#1a140a 100%)',padding:'72px 24px 80px',textAlign:'center',position:'relative',overflow:'hidden'}},
+      h('div',{style:{position:'absolute',inset:0,background:'radial-gradient(ellipse 60% 50% at 50% 50%,rgba(201,168,76,0.07) 0%,transparent 70%)',pointerEvents:'none'}}),
+      h('div',{style:{fontSize:10,letterSpacing:'0.4em',color:'rgba(201,168,76,0.65)',marginBottom:24}},
+        'МЕТАФОРИЧЕСКИЕ АССОЦИАТИВНЫЕ КАРТЫ'
+      ),
+      h('h1',{className:'serif',style:{fontSize:'clamp(36px,6vw,62px)',fontWeight:300,lineHeight:1.1,color:'#F0EAD6',marginBottom:18}},
+        'Загляни в себя.',h('br',null),
+        h('span',{style:{color:'#C9A84C',fontStyle:'italic'}},'Честно.')
+      ),
+      h('p',{style:{fontSize:15,color:'rgba(240,234,214,0.55)',maxWidth:440,margin:'0 auto 36px',lineHeight:1.8,fontWeight:300}},
+        'МАК-карты — инструмент глубинной психологии. Каждый образ отражает то, что живёт внутри вас.'
+      ),
+      h('div',{style:{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap',marginBottom:52}},
+        h('button',{style:{...btnG,padding:'14px 32px',fontSize:14},onClick:()=>setScreen('cards')},'Выбрать карту'),
+        h('a',{href:WA,target:'_blank'},h('button',{style:{...btnS,padding:'14px 32px',fontSize:14,color:'rgba(240,234,214,0.65)',borderColor:'rgba(255,255,255,0.12)'}},'Связаться'))
+      ),
+      h('div',{style:{display:'flex',justifyContent:'center',gap:10,opacity:0.9,flexWrap:'wrap'}},
+        ...cards.slice(0,6).map(c=>h(CardVis,{key:c.id,c}))
+      )
+    ),
+    h('div',{style:{padding:'64px 24px',maxWidth:820,margin:'0 auto',textAlign:'center'}},
+      h('div',{style:tag},'КАК ЭТО РАБОТАЕТ'),
+      h('h2',{className:'serif',style:{fontSize:34,fontWeight:300,marginBottom:40,color:dk}},'Три простых шага'),
+      h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:20}},
+        ...[
+          {n:'01',t:'Выберите карту',d:'Зайдите в каталог и выберите ту, что притягивает взгляд. Доверьтесь первому импульсу.'},
+          {n:'02',t:'Прочитайте вопрос',d:'Каждая карта содержит терапевтический вопрос, который помогает заглянуть глубже.'},
+          {n:'03',t:'Напишите нам',d:'Для полного доступа ко всем описаниям свяжитесь с нами в WhatsApp.'},
+        ].map(s=>h('div',{key:s.n,style:{padding:24,background:wht,borderRadius:12,border:`1px solid ${bdr}`,textAlign:'left'}},
+          h('div',{className:'serif',style:{fontSize:34,color:gold,fontWeight:300,marginBottom:10,lineHeight:1}},s.n),
+          h('div',{style:{fontWeight:500,fontSize:15,marginBottom:8}},s.t),
+          h('div',{style:{fontSize:13,color:muted,lineHeight:1.7}},s.d)
+        ))
+      )
+    ),
+    h('div',{style:{background:'#1C1208',padding:'52px 24px',textAlign:'center'}},
+      h('h2',{className:'serif',style:{fontSize:30,fontWeight:300,color:'#F0EAD6',marginBottom:12}},'Готовы начать?'),
+      h('p',{style:{fontSize:14,color:'rgba(240,234,214,0.45)',marginBottom:24,lineHeight:1.65}},'Выберите карту, которая притягивает. Это ни к чему не обязывает.'),
+      h('button',{style:{...btnG,padding:'14px 36px',fontSize:14},onClick:()=>setScreen('cards')},'Смотреть карты')
+    ),
+    h('footer',{style:{padding:'20px 28px',borderTop:`1px solid ${bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}},
+      h('div',{onClick:()=>setScreen('landing')},h(Logo,{size:18})),
+      h('div',{style:{fontSize:12,color:muted}},'zerkalo.kz • +7 702 287 3154'),
+      h('button',{style:{background:'none',border:'none',fontSize:12,color:muted,cursor:'pointer'},onClick:()=>setScreen('adminLogin')},'Администратор')
+    )
+  );
+
+  // ══ КАТАЛОГ ══
+  if(screen==='cards')return h('div',{style:{minHeight:'100vh',background:bg}},
+    h('div',{style:hdrS},
+      h('div',{onClick:()=>setScreen('landing')},h(Logo,{size:20})),
+      h('button',{style:{...btnS,padding:'8px 16px',fontSize:12},onClick:()=>setScreen('landing')},'← Главная')
+    ),
+    h('div',{style:{padding:'36px 24px',maxWidth:920,margin:'0 auto'}},
+      h('div',{style:{textAlign:'center',marginBottom:36}},
+        h('h1',{className:'serif',style:{fontSize:34,fontWeight:300,marginBottom:10}},'Карты'),
+        h('p',{style:{fontSize:14,color:muted,lineHeight:1.7,maxWidth:400,margin:'0 auto'}},'Выберите карту, которая привлекает внимание. Доверьтесь первому импульсу.')
+      ),
+      h('div',{style:{display:'flex',flexWrap:'wrap',gap:12,justifyContent:'center'}},
+        ...cards.map(c=>h(CardVis,{key:c.id,c,onClick:()=>{setSelCard(c);setScreen('card');}}))
+      )
+    )
+  );
+
+  // ══ КАРТА ══
+  if(screen==='card'&&selCard)return h('div',{style:{minHeight:'100vh',background:bg}},
+    h('div',{style:hdrS},
+      h('div',{onClick:()=>setScreen('landing')},h(Logo,{size:20})),
+      h('button',{style:{...btnS,padding:'8px 16px',fontSize:12},onClick:()=>setScreen('cards')},'← Все карты')
+    ),
+    h('div',{className:'fi',style:{maxWidth:520,margin:'40px auto',padding:'0 24px'}},
+      h('div',{style:{display:'flex',justifyContent:'center',marginBottom:28}},h(CardVis,{c:selCard,size:'lg'})),
+      h('div',{style:{textAlign:'center',marginBottom:26}},
+        h('h2',{className:'serif',style:{fontSize:36,fontWeight:400,marginBottom:8}},selCard.title),
+        h('div',{style:{fontSize:11,color:selCard.color,letterSpacing:'0.12em',opacity:0.9}},'КАРТА #'+selCard.id)
+      ),
+      h('div',{style:{background:wht,border:`1px solid ${bdr}`,borderRadius:12,padding:22,marginBottom:16}},
+        h('div',{style:{fontSize:10,color:muted,letterSpacing:'0.1em',marginBottom:10}},'ВОПРОС ДЛЯ РАЗМЫШЛЕНИЯ'),
+        h('p',{className:'serif',style:{fontSize:18,color:dk,lineHeight:1.85,fontStyle:'italic'}},
+          '"'+selCard.desc.split('.')[0]+'."'
+        )
+      ),
+      h('div',{style:{background:`linear-gradient(135deg,${selCard.color}0A,${selCard.color}18)`,border:`1px solid ${selCard.color}33`,borderRadius:12,padding:22,marginBottom:16}},
+        h('p',{style:{fontSize:14,color:dk,marginBottom:16,lineHeight:1.7,textAlign:'center'}},
+          'Хотите получить полное описание и поработать с психологом? Напишите нам — расскажем об условиях.'
+        ),
+        h(WABtn,null)
+      ),
+      h('div',{style:{background:wht,border:`1px solid ${bdr}`,borderRadius:12,padding:18}},
+        h('div',{style:{fontSize:10,color:muted,letterSpacing:'0.1em',marginBottom:10}},'ЕСТЬ ПРОМОКОД?'),
+        h('div',{style:{display:'flex',gap:8}},
+          h('input',{style:{...inp,marginBottom:0,flex:1},placeholder:'Введите промокод',value:promoInput,onChange:e=>{setPromoInput(e.target.value);setPromoMsg('');}}),
+          h('button',{style:{...btnG,padding:'0 16px',fontSize:13},onClick:applyPromo},'Применить')
+        ),
+        promoMsg&&h('div',{style:{fontSize:12,marginTop:8,color:promoMsg.startsWith('✓')?'#2E7D50':'#C0392B',lineHeight:1.5}},promoMsg)
+      )
+    )
+  );
+
+  // ══ ЛОГИН АДМИНА ══
+  if(screen==='adminLogin')return h('div',{style:{minHeight:'100vh',background:bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:20}},
+    h('div',{style:{marginBottom:28},onClick:()=>setScreen('landing')},h(Logo,{size:24})),
+    h('div',{className:'fi',style:{background:wht,border:`1px solid ${bdr}`,borderRadius:14,padding:34,width:'100%',maxWidth:320,boxShadow:'0 6px 24px rgba(0,0,0,0.07)'}},
+      h('div',{className:'serif',style:{fontSize:22,marginBottom:22,textAlign:'center',fontWeight:400}},'Администратор'),
+      h('input',{style:inp,placeholder:'Email',value:login.email,onChange:e=>setLogin({...login,email:e.target.value}),onKeyDown:e=>e.key==='Enter'&&doAdminLogin()}),
+      h('input',{style:inp,type:'password',placeholder:'Пароль',value:login.pass,onChange:e=>setLogin({...login,pass:e.target.value}),onKeyDown:e=>e.key==='Enter'&&doAdminLogin()}),
+      loginErr&&h('div',{style:{fontSize:12,color:'#C0392B',marginBottom:8,textAlign:'center'}},loginErr),
+      h('div',{style:{fontSize:11,color:muted,marginBottom:12,textAlign:'center',lineHeight:1.5}},
+        'admin@zerkalo.kz',h('br',null),'admin123'
+      ),
+      h('button',{style:{...btnP,width:'100%',padding:13},onClick:doAdminLogin},'Войти')
+    ),
+    h('div',{style:{marginTop:16,fontSize:12,color:muted,cursor:'pointer'},onClick:()=>setScreen('landing')},'← На главную')
+  );
+
+  // ══ АДМИН ПАНЕЛЬ ══
+  if(screen==='admin')return h('div',{style:{minHeight:'100vh',background:'#F4F1EC'}},
+    h('div',{style:{...hdrS,background:'#1C1208',borderColor:'#2A1E10'}},
+      h('div',{onClick:()=>setScreen('landing')},h(Logo,{size:20,light:true})),
+      h('div',{style:{display:'flex',alignItems:'center',gap:12}},
+        h('span',{style:{fontSize:12,color:'rgba(240,234,214,0.35)'}},'Панель управления'),
+        h('button',{style:{background:'transparent',color:'rgba(240,234,214,0.55)',padding:'7px 14px',borderRadius:4,fontSize:12,border:'1px solid rgba(255,255,255,0.1)',cursor:'pointer'},onClick:()=>setScreen('landing')},'← Сайт')
+      )
+    ),
+    h('div',{style:{display:'flex',borderBottom:`1px solid ${bdr}`,background:wht,padding:'0 22px'}},
+      ...['cards','promos'].map((t,i)=>h('div',{key:t,onClick:()=>setAdminTab(t),style:{padding:'13px 20px',fontSize:13,cursor:'pointer',borderBottom:adminTab===t?`2px solid ${gold}`:'2px solid transparent',color:adminTab===t?gold:muted,marginBottom:-1,transition:'all 0.2s'}},
+        ['Карты ('+cards.length+')','Промокоды ('+promos.length+')'][i]
+      ))
+    ),
+    h('div',{style:{padding:22,maxWidth:900,margin:'0 auto'}},
+
+      adminTab==='cards'&&h('div',null,
+        h('div',{style:{background:wht,border:`1px solid ${bdr}`,borderRadius:10,padding:20,marginBottom:18}},
+          h('div',{style:tag},'ДОБАВИТЬ НОВУЮ КАРТУ'),
+          h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
+            h('input',{style:{...inp,marginBottom:0},placeholder:'Название карты',value:newCard.title,onChange:e=>setNewCard({...newCard,title:e.target.value})}),
+            h('input',{style:{...inp,marginBottom:0},placeholder:'Ссылка на фото (https://...)',value:newCard.img,onChange:e=>setNewCard({...newCard,img:e.target.value})})
+          ),
+          h('div',{style:{height:10}}),
+          h('textarea',{style:{...inp,height:80,resize:'vertical',lineHeight:1.7},placeholder:'Полное описание карты — терапевтический вопрос и текст',value:newCard.desc,onChange:e=>setNewCard({...newCard,desc:e.target.value})}),
+          h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}},
+            h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+              h('label',{style:{fontSize:12,color:muted}},'Цвет:'),
+              h('input',{type:'color',value:newCard.color,onChange:e=>setNewCard({...newCard,color:e.target.value}),style:{width:32,height:28,borderRadius:4,border:`1px solid ${bdr}`,cursor:'pointer',padding:2}}),
+              newCard.img&&h('img',{src:newCard.img,style:{width:34,height:48,objectFit:'cover',borderRadius:4,border:`1px solid ${bdr}`},onError:e=>e.target.style.display='none'})
+            ),
+            h('button',{style:btnP,onClick:doAddCard},'+ Добавить карту')
+          )
+        ),
+        h('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+          ...cards.map(c=>editId===c.id
+            ?h('div',{key:c.id,style:{background:'#FFFCF0',border:`2px solid ${gold}44`,borderRadius:10,padding:16}},
+                h('div',{style:{fontSize:10,color:gold,letterSpacing:'0.1em',marginBottom:10}},'РЕДАКТИРОВАТЬ • '+c.title.toUpperCase()),
+                h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
+                  h('input',{style:{...inp,marginBottom:0},placeholder:'Название',value:editData.title||'',onChange:e=>setEditData({...editData,title:e.target.value})}),
+                  h('input',{style:{...inp,marginBottom:0},placeholder:'Ссылка на фото',value:editData.img||'',onChange:e=>setEditData({...editData,img:e.target.value})})
+                ),
+                h('div',{style:{height:10}}),
+                h('textarea',{style:{...inp,height:90,resize:'vertical',lineHeight:1.7},placeholder:'Описание',value:editData.desc||'',onChange:e=>setEditData({...editData,desc:e.target.value})}),
+                editData.img&&h('img',{src:editData.img,style:{width:40,height:56,objectFit:'cover',borderRadius:5,marginBottom:10,border:`1px solid ${bdr}`},onError:e=>e.target.style.display='none'}),
+                h('div',{style:{display:'flex',gap:8}},
+                  h('button',{style:btnG,onClick:()=>saveEdit(c.id)},'Сохранить'),
+                  h('button',{style:btnS,onClick:()=>setEditId(null)},'Отмена')
+                )
+              )
+            :h('div',{key:c.id,style:{background:wht,border:`1px solid ${bdr}`,borderRadius:8,padding:'11px 14px',display:'flex',alignItems:'center',gap:12}},
+                c.img
+                  ?h('img',{src:c.img,style:{width:32,height:46,objectFit:'cover',borderRadius:5,flexShrink:0},onError:e=>e.target.style.display='none'})
+                  :h('div',{style:{width:32,height:46,borderRadius:5,background:`linear-gradient(135deg,${c.bg||'#0a0800'},${c.color}66)`,flexShrink:0}}),
+                h('div',{style:{flex:1,minWidth:0}},
+                  h('div',{style:{fontWeight:500,fontSize:13,marginBottom:2}},c.title),
+                  h('div',{style:{fontSize:11,color:muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.desc.slice(0,90)+'...')
+                ),
+                h('div',{style:{display:'flex',gap:6,flexShrink:0}},
+                  h('button',{style:{background:'#E8A020',color:'#fff',padding:'5px 12px',borderRadius:4,fontSize:12,border:'none',cursor:'pointer'},onClick:()=>{setEditId(c.id);setEditData({title:c.title,desc:c.desc,img:c.img||''});}},'Изменить'),
+                  h('button',{style:{background:'none',border:`1px solid ${bdr}`,color:'#C0392B',padding:'5px 10px',borderRadius:4,fontSize:12,cursor:'pointer'},onClick:()=>setCards(p=>p.filter(x=>x.id!==c.id))},'Удалить')
+                )
+              )
+          )
+        )
+      ),
+
+      adminTab==='promos'&&h('div',null,
+        h('div',{style:{background:wht,border:`1px solid ${bdr}`,borderRadius:10,padding:20,marginBottom:18}},
+          h('div',{style:tag},'СОЗДАТЬ ПРОМОКОД'),
+          h('div',{style:{display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap'}},
+            h('div',{style:{flex:1,minWidth:180}},
+              h('div',{style:{fontSize:11,color:muted,marginBottom:6}},'Код (свой или авто)'),
+              h('div',{style:{display:'flex',gap:6}},
+                h('input',{style:{...inp,marginBottom:0,flex:1,textTransform:'uppercase',fontFamily:'monospace',fontWeight:600,letterSpacing:'0.05em'},placeholder:'ZERKALO30',value:newPromo.code,onChange:e=>setNewPromo({...newPromo,code:e.target.value})}),
+                h('button',{style:{...btnS,padding:'0 14px',fontSize:12,whiteSpace:'nowrap'},onClick:()=>setNewPromo({...newPromo,code:'ZK'+Math.random().toString(36).slice(2,6).toUpperCase()})},'Авто')
+              )
+            ),
+            h('div',{style:{minWidth:160}},
+              h('div',{style:{fontSize:11,color:muted,marginBottom:6}},'Срок действия'),
+              h('select',{style:{...inp,marginBottom:0},value:newPromo.dur,onChange:e=>setNewPromo({...newPromo,dur:e.target.value})},
+                ...DURS.map(d=>h('option',{key:d.id,value:d.id},d.l))
+              )
+            ),
+            h('button',{style:{...btnP,padding:'11px 20px'},onClick:doAddPromo},'Создать')
+          )
+        ),
+        h('div',{style:{background:wht,border:`1px solid ${bdr}`,borderRadius:10,overflow:'hidden'}},
+          promos.length===0&&h('div',{style:{padding:20,textAlign:'center',color:muted}},'Промокодов нет'),
+          ...promos.map((p,i)=>h('div',{key:p.code,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',borderBottom:i<promos.length-1?`1px solid ${bdr}`:'none'}},
+            h('div',null,
+              h('div',{style:{fontFamily:'monospace',fontSize:16,fontWeight:700,color:p.used?muted:dk,letterSpacing:'0.08em'}},p.code),
+              h('div',{style:{fontSize:11,color:muted,marginTop:3}},DURS.find(d=>d.id===p.duration)?.l)
+            ),
+            h('div',{style:{display:'flex',alignItems:'center',gap:8}},
+              h('div',{style:{fontSize:11,padding:'4px 12px',borderRadius:20,fontWeight:500,background:p.used?'#F5F5F5':'#E8F8EF',color:p.used?muted:'#2E7D50'}},p.used?'Использован':'Активен'),
+              h('button',{onClick:()=>setPromos(prev=>prev.filter(x=>x.code!==p.code)),style:{background:'none',border:`1px solid ${bdr}`,color:'#C0392B',padding:'4px 10px',borderRadius:4,fontSize:13,cursor:'pointer'}},'✕')
+            )
+          ))
+        )
+      )
+    )
+  );
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
