@@ -27,3 +27,17 @@ class IsRestaurantStaff(BasePermission):
             return True
         rest_id = view.kwargs.get('rest_id')
         return rest_id is not None and str(request.user.restaurant_id) == str(rest_id)
+
+
+class IsRestaurantSessionStaff(IsRestaurantStaff):
+    """Tenant guard для staff-endpoints сессий/заказов.
+
+    Держим отдельное имя permission намеренно: session views дополнительно
+    применяют role-specific ограничения (назначенные столы официанта,
+    least-privilege для kitchen, управление оплатой и закрытием счёта), а этот
+    permission отвечает только за базовые гарантии аутентификации и изоляции
+    ресторана. Наследование от IsRestaurantStaff не расширяет доступ и не
+    дублирует tenant-логику.
+    """
+
+    pass
