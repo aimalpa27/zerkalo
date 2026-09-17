@@ -1,0 +1,43 @@
+name: Fix stale close realtime test
+
+on:
+  push:
+    branches:
+      - plait-staging
+    paths:
+      - .github/workflows/fix-stale-close-realtime-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: plait-staging
+      - name: Update realtime close regression setup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/apps/sessions/tests.py')
+          text = path.read_text(encoding='utf-8')
+          old = """    def test_close_broadcasts_closed_status_to_staff_and_guest(self):\n        from unittest.mock import patch\n\n        self.client.force_authenticate(user=self.admin)\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'\n"""
+          new = """    def test_close_broadcasts_closed_status_to_staff_and_guest(self):\n        from unittest.mock import patch\n\n        # Closing a dine-in bill is only legal after the payment flow starts.\n        # Keep this realtime regression aligned with the production guard rather\n        # than bypassing the guard with an impossible open -> closed transition.\n        self.session.status = 'payment_requested'\n        self.session.save(update_fields=['status'])\n\n        self.client.force_authenticate(user=self.admin)\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'\n"""
+          if old not in text:
+              raise SystemExit('expected stale test block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit patched regression test
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/apps/sessions/tests.py
+          git diff --cached --quiet && exit 0
+          git commit -m "test: align close realtime regression with payment guard"
+          git push origin HEAD:plait-staging
