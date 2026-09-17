@@ -5,19 +5,19 @@
 | Title | Priority | Business impact | Complexity | Estimate | Dependencies | Status |
 |---|---|---:|---:|---:|---|---|
 | Direct QR auto-connect | P0 | Critical | S | 1–2h | guest endpoint | DONE 2026-09-16 |
-| Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 — GitHub Actions + local verify script; current sandbox install blocked by DNS |
-| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | DONE 2026-09-17 — full backend runtime + WebSocket cross-tenant suite green in GitHub Actions |
-| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | DONE 2026-09-17 — QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics regression green |
-| Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | DONE 2026-09-17 — dedicated role, action scope, frontend auth, tests |
-| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | DONE 2026-09-17 — status broadcast + JWT refresh/backoff + assigned-waiter scope + communicator cross-tenant/invalid-token regression green |
-| Error/loading/empty state audit | P1 | High | M | 1d | core screens | DONE 2026-09-17 — Kitchen Cycle 13; Admin Sessions/Calls/Analytics Cycle 14; Guest Restaurant/Table/Menu/Cart/Checkout recovery + cart draft persistence Cycle 15 |
-| PWA service worker/update strategy | P1 | High | M | 0.5–1d | Vite | DONE 2026-09-17 — offline shell + safe update prompt + transactional API cache bypass |
+| Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 — GitHub Actions + local verify script |
+| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | DONE 2026-09-17 — full backend runtime + WebSocket cross-tenant suite green |
+| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | DONE 2026-09-17 — QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics green |
+| Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | DONE 2026-09-17 |
+| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | DONE 2026-09-17 |
+| Error/loading/empty state audit | P1 | High | M | 1d | core screens | DONE 2026-09-17 |
+| PWA service worker/update strategy | P1 | High | M | 0.5–1d | Vite | DONE 2026-09-17 |
 
 ## PHASE 2 — First 10 restaurants
 
 | Title | Priority | Business impact | Complexity | Estimate | Dependencies | Status |
 |---|---|---:|---:|---:|---|---|
-| Onboarding wizard | P1 | Critical | L | 2–4d | restaurant/menu/table/staff APIs | TODO |
+| Onboarding wizard | P1 | Critical | L | 2–4d | restaurant/menu/table/staff APIs | DONE 2026-09-17 — Admin/Manager readiness wizard, real-data progress, role isolation, mobile sheet, Go Live publication + preview; CI/regression green |
 | Bulk tables 1–N | P1 | High | M | 0.5–1d | table API | TODO |
 | Bulk QR PDF export | P1 | High | M | 1d | tables | TODO |
 | CSV/XLSX menu import | P1 | High | L | 1–2d | menu CRUD | TODO |
