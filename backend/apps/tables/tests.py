@@ -40,7 +40,10 @@ class TableBulkCreateTest(APITestCase):
         self.assertTrue(all(x.get('token') and x.get('qr_url') for x in r.data['created']))
     def test_duplicate_aborts_entire_batch(self):
         Table.objects.create(restaurant=self.restaurant,number=5); self.client.force_authenticate(user=self.admin)
-        r=self.client.post(self._url(),{'start':1,'end':10},format='json'); self.assertEqual(r.status_code,400); self.assertEqual(Table.objects.filter(restaurant=self.restaurant).count(),1); self.assertIn(5,r.data['duplicates'])
+        r=self.client.post(self._url(),{'start':1,'end':10},format='json')
+        self.assertEqual(r.status_code,400)
+        self.assertEqual(Table.objects.filter(restaurant=self.restaurant).count(),1)
+        self.assertIn('5', [str(value) for value in r.data['duplicates']])
     def test_invalid_range_rejected(self):
         self.client.force_authenticate(user=self.admin); self.assertEqual(self.client.post(self._url(),{'start':10,'end':1},format='json').status_code,400)
         self.assertEqual(self.client.post(self._url(),{'start':1,'end':201},format='json').status_code,400)
