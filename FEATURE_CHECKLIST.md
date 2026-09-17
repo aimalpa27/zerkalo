@@ -7,7 +7,7 @@
 | Restaurants | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | partial | NO |
 | Menu | PARTIAL | ✓ resilient | ✓ CRUD | reads items | ✓ | ✓ tenant hardened | ✓ | ✓ | regression green | partial | NO |
 | Categories | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | N/A | NO |
-| Tables | PARTIAL | ✓ | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | backend partial | partial | NO |
+| Tables | PARTIAL | ✓ QR | ✓ CRUD + bulk 1–N | read only | ✓ atomic bulk | Admin/Manager mutate; Waiter/Kitchen denied bulk | ✓ responsive | ✓ duplicates/range/plan errors | bulk suite added; CI running | partial | NO |
 | QR Tables | PARTIAL | ✓ direct flow | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | lifecycle regression green | partial | NO |
 | Cart | PARTIAL | ✓ 24h scoped draft | N/A | N/A | N/A | context-isolated | ✓ | ✓ | lifecycle regression green | N/A | NO |
 | Orders | PARTIAL | ✓ realtime | ✓ realtime | ✓ realtime | ✓ | ✓ | ✓ | ✓ | full lifecycle green | ✓ | NO |
@@ -19,7 +19,7 @@
 | Payments | PARTIAL | request/method | ✓ guarded close | N/A | ✓ | ✓ | ✓ | ✓ | regression green | ✓ | NO |
 | Promos | PARTIAL | ✓ | limited | N/A | ✓ | review | ✓ | partial | limited | limited | NO |
 | Settings | PARTIAL | consumes | ✓ | N/A | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
-| Onboarding | READY | N/A | ✓ real-data readiness + Go Live | hidden | existing restaurant/menu/table/staff APIs | Admin/Manager only; Waiter/Kitchen excluded | ✓ bottom-sheet responsive | ✓ publish retry/error + incomplete-state guard | frontend typecheck/build + backend lifecycle regression green | N/A | YES |
+| Onboarding | READY | N/A | ✓ real-data readiness + Go Live | hidden | existing APIs | Admin/Manager only | ✓ | ✓ | green | N/A | YES |
 | Delivery/Takeaway | PARTIAL | ✓ | ✓ | partial | ✓ | ✓ | ✓ | partial | backend present | partial | NO |
 | Chat | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
 | Schedule | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
