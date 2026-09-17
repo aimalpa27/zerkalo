@@ -1,5 +1,18 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-17 — Cycle 17
+
+### Что изменено
+- Закрыт оставшийся P0 runtime verification: исправлен stale realtime close regression без ослабления production payment guard.
+- Full backend suite теперь проверяет тот же допустимый payment_requested → closed переход, что и production API.
+- Подтверждены tenant isolation, Kitchen least privilege, assigned-waiter scope, WebSocket invalid/expired JWT denial и отсутствие cross-restaurant event leakage.
+- Подтверждён полный restaurant flow QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics.
+- Frontend typecheck/build включены в тот же verification run.
+- AI_ENABLED=false сохранён; внешние AI API не подключались.
+
+### Результат
+P0 production-regression gates подтверждены runtime-тестами. Следующий приоритет — P1 Onboarding Wizard для первых ресторанов.
+
 ## 2026-09-17 — Cycle 6
 
 ### Что изменено
