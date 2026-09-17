@@ -1,0 +1,92 @@
+name: Sync Plait Cycle 16 to staging v2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sync-plait-cycle16-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Extract and validate Cycle 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f Plait-cycle-16.zip
+          unzip -t Plait-cycle-16.zip >/dev/null
+          rm -rf /tmp/plait-cycle16
+          mkdir -p /tmp/plait-cycle16
+          unzip -q Plait-cycle-16.zip -d /tmp/plait-cycle16
+          ROOT=/tmp/plait-cycle16
+          COUNT=$(find "$ROOT" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+          if [ "$COUNT" = "1" ]; then
+            ONLY=$(find "$ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)
+            if [ -n "$ONLY" ]; then ROOT="$ONLY"; fi
+          fi
+          test -d "$ROOT/backend"
+          test -d "$ROOT/frontend"
+          test -d "$ROOT/scripts"
+          test -f "$ROOT/README.md"
+          test -f "$ROOT/ROADMAP.md"
+          test -f "$ROOT/FEATURE_CHECKLIST.md"
+          test -f "$ROOT/CHANGELOG_PLAIT.md"
+
+          find "$ROOT" -type d \( -name node_modules -o -name .venv -o -name venv -o -name __pycache__ -o -name dist -o -name build \) -prune -exec rm -rf {} + || true
+          find "$ROOT" -type f \( -name '*.pyc' -o -name '.DS_Store' -o -name '.env' \) -delete || true
+          find "$ROOT" -type f \( -name '*serviceAccount*.json' -o -name 'service-account*.json' -o -name 'firebase-adminsdk*.json' \) -delete || true
+
+          if [ -f "$ROOT/.github/workflows/ci.yml" ]; then
+            cp "$ROOT/.github/workflows/ci.yml" /tmp/plait-ci.yml
+          fi
+          rm -rf "$ROOT/.github/workflows"
+          echo "SOURCE_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Replace staging source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C plait-staging
+          git rm -rf . >/dev/null 2>&1 || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a "$SOURCE_ROOT"/. .
+          if [ -f /tmp/plait-ci.yml ]; then cp /tmp/plait-ci.yml .plait-ci.yml; fi
+
+          if [ -f backend/.env.example ]; then
+            grep -q '^AI_ENABLED=' backend/.env.example && sed -i 's/^AI_ENABLED=.*/AI_ENABLED=false/' backend/.env.example || printf '\nAI_ENABLED=false\n' >> backend/.env.example
+          fi
+          if [ -f frontend/.env.example ]; then
+            grep -q '^VITE_AI_ENABLED=' frontend/.env.example && sed -i 's/^VITE_AI_ENABLED=.*/VITE_AI_ENABLED=false/' frontend/.env.example || printf '\nVITE_AI_ENABLED=false\n' >> frontend/.env.example
+          fi
+
+          git add -A
+          git commit -m "feat: sync full Plait Cycle 16 source"
+          git push --force origin HEAD:plait-staging
+
+      - name: Verify staging tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d backend
+          test -d frontend
+          test -d scripts
+          test -f README.md
+          test -f ROADMAP.md
+          test -f FEATURE_CHECKLIST.md
+          test -f CHANGELOG_PLAIT.md
+          test -f .plait-ci.yml
+          echo "Cycle 16 source synchronized."
