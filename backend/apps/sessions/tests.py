@@ -426,6 +426,12 @@ class SessionRealtimeNotificationTest(APITestCase):
     def test_close_broadcasts_closed_status_to_staff_and_guest(self):
         from unittest.mock import patch
 
+        # Closing a dine-in bill is only legal after the payment flow starts.
+        # Keep this realtime regression aligned with the production guard rather
+        # than bypassing the guard with an impossible open -> closed transition.
+        self.session.status = 'payment_requested'
+        self.session.save(update_fields=['status'])
+
         self.client.force_authenticate(user=self.admin)
         url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'
         with patch('apps.websocket.events.notify_session_status') as notify:
