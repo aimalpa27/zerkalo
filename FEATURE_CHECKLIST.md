@@ -5,23 +5,23 @@
 | Функция | Статус | Guest | Admin | Kitchen | Backend/DB | Permissions | Mobile | Errors | Tests | Analytics | Production Ready |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Restaurants | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | partial | NO |
-| Menu | PARTIAL | ✓ resilient loading/error/empty/retry + stale snapshot | ✓ | reads items | ✓ | ✓ tenant relation hardened | ✓ | ✓ guest recovery | tenant regression runtime green | partial | NO |
+| Menu | PARTIAL | ✓ resilient | ✓ CRUD | reads items | ✓ | ✓ tenant hardened | ✓ | ✓ | regression green | partial | NO |
 | Categories | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | N/A | NO |
 | Tables | PARTIAL | ✓ | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | backend partial | partial | NO |
-| QR Tables | PARTIAL | ✓ FIXED direct flow | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | needs frontend E2E | partial | NO |
-| Cart | PARTIAL | ✓ 24h restaurant/table-scoped draft persistence | N/A | N/A | N/A | context-isolated draft | ✓ | ✓ preserved on menu/order failure | missing frontend runtime tests | N/A | NO |
-| Orders | PARTIAL | ✓ realtime status + checkout retry without cart loss | ✓ realtime + resilient sessions loading/error/retry | ✓ realtime refresh + JWT reconnect hardened | ✓ session race + status broadcast hardened | ✓ tenant + assigned-waiter table scope | ✓ | payment-boundary error ✓ | full cross-endpoint QR→close→analytics regression runtime green + CI gate | final total/top revenue hardened | NO |
-| Kitchen | PARTIAL | N/A | sees statuses | ✓ dedicated kitchen auth + realtime reload | ✓ dedicated role | ✓ least privilege: read sessions + confirmed↔ready only | tablet/mobile resilient | ✓ loading/error/empty + retry + stale-data preservation + action errors | regression runtime green + CI gate | prep data partial | NO |
-| Waiter Calls | PARTIAL | ✓ | ✓ resilient loading/error/retry | N/A | ✓ | ✓ assigned-waiter REST/realtime scope | ✓ | ✓ stale-data warning | backend present | limited | NO |
-| Staff | PARTIAL | N/A | ✓ | dedicated kitchen auth | ✓ | ✓ kitchen excluded from generic staff APIs | ✓ | partial | kitchen creation/isolation regression added | limited | NO |
-| Analytics | PARTIAL | N/A | ✓ authoritative API + retry/stale snapshot | N/A | ✓ summary + closed history | ✓ | ✓ | ✓ no fake-zero fallback | quantity/non-billable + full-flow regression added | ✓ top-item revenue fixed + closed history | NO |
+| QR Tables | PARTIAL | ✓ direct flow | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | lifecycle regression green | partial | NO |
+| Cart | PARTIAL | ✓ 24h scoped draft | N/A | N/A | N/A | context-isolated | ✓ | ✓ | lifecycle regression green | N/A | NO |
+| Orders | PARTIAL | ✓ realtime | ✓ realtime | ✓ realtime | ✓ | ✓ | ✓ | ✓ | full lifecycle green | ✓ | NO |
+| Kitchen | PARTIAL | N/A | sees statuses | ✓ dedicated | ✓ | ✓ least privilege | ✓ | ✓ | regression green | partial | NO |
+| Waiter Calls | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ assigned scope | ✓ | ✓ | backend present | limited | NO |
+| Staff | PARTIAL | N/A | ✓ | dedicated auth | ✓ | ✓ | ✓ | partial | isolation green | limited | NO |
+| Analytics | PARTIAL | N/A | ✓ | N/A | ✓ | ✓ | ✓ | ✓ | full-flow green | ✓ | NO |
 | Upsell | NOT IMPLEMENTED | — | — | N/A | — | — | — | — | — | — | NO |
-| Payments | PARTIAL | request/method | ✓ guarded close | N/A | ✓ transition guards | ✓ waiter/role scope | ✓ | explicit close errors ✓ | backend regression added | closed-total consistency ✓ | NO |
+| Payments | PARTIAL | request/method | ✓ guarded close | N/A | ✓ | ✓ | ✓ | ✓ | regression green | ✓ | NO |
 | Promos | PARTIAL | ✓ | limited | N/A | ✓ | review | ✓ | partial | limited | limited | NO |
 | Settings | PARTIAL | consumes | ✓ | N/A | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
-| Onboarding | NOT IMPLEMENTED | N/A | — | N/A | existing primitives | — | — | — | — | — | NO |
+| Onboarding | READY | N/A | ✓ real-data readiness + Go Live | hidden | existing restaurant/menu/table/staff APIs | Admin/Manager only; Waiter/Kitchen excluded | ✓ bottom-sheet responsive | ✓ publish retry/error + incomplete-state guard | frontend typecheck/build + backend lifecycle regression green | N/A | YES |
 | Delivery/Takeaway | PARTIAL | ✓ | ✓ | partial | ✓ | ✓ | ✓ | partial | backend present | partial | NO |
 | Chat | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
 | Schedule | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
-| PWA | PARTIAL | ✓ manifest + offline shell + safe update prompt | N/A | manifest | SW static cache only | transactional API bypass | ✓ | ✓ offline/update recovery | static boundary checks; runtime build via CI | N/A | NO |
+| PWA | PARTIAL | ✓ manifest + offline shell | N/A | manifest | SW static cache only | transactional API bypass | ✓ | ✓ | boundary checks + CI build | N/A | NO |
 | Demo Mode | NOT IMPLEMENTED | — | — | — | — | — | — | — | — | — | NO |
