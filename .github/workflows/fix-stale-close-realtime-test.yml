@@ -1,4 +1,4 @@
-name: Fix stale close realtime test
+name: Verify Plait after realtime fix
 
 on:
   push:
@@ -11,33 +11,95 @@ permissions:
   contents: write
 
 jobs:
-  patch-test:
+  verify-and-document:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      SECRET_KEY: ci-only-secret-key-not-for-production
+      DEBUG: "True"
+      DATABASE_URL: sqlite:///ci.sqlite3
+      REDIS_URL: redis://localhost:6379/0
+      AI_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
         with:
           ref: plait-staging
-      - name: Update realtime close regression setup
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Backend dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+      - name: Backend checks and migrations
+        working-directory: backend
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate --noinput
+      - name: Full restaurant regression
+        working-directory: backend
+        run: python manage.py test apps.sessions.tests.FullRestaurantRegressionFlowTest apps.sessions.tests.KitchenLeastPrivilegeTests apps.websocket.tests.WebsocketTenantIsolationTests -v 2
+      - name: Full backend suite
+        working-directory: backend
+        run: python manage.py test apps.users apps.restaurants apps.menu apps.tables apps.sessions apps.calls apps.analytics apps.websocket -v 1
+      - name: Frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend typecheck and build
+        working-directory: frontend
+        run: |
+          npm run typecheck
+          npm run build
+      - name: Update P0 runtime documentation
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('backend/apps/sessions/tests.py')
-          text = path.read_text(encoding='utf-8')
-          old = """    def test_close_broadcasts_closed_status_to_staff_and_guest(self):\n        from unittest.mock import patch\n\n        self.client.force_authenticate(user=self.admin)\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'\n"""
-          new = """    def test_close_broadcasts_closed_status_to_staff_and_guest(self):\n        from unittest.mock import patch\n\n        # Closing a dine-in bill is only legal after the payment flow starts.\n        # Keep this realtime regression aligned with the production guard rather\n        # than bypassing the guard with an impossible open -> closed transition.\n        self.session.status = 'payment_requested'\n        self.session.save(update_fields=['status'])\n\n        self.client.force_authenticate(user=self.admin)\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'\n"""
-          if old not in text:
-              raise SystemExit('expected stale test block not found')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          roadmap = Path('ROADMAP.md')
+          text = roadmap.read_text(encoding='utf-8')
+          text = text.replace(
+              '| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |',
+              '| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | DONE 2026-09-17 — full backend runtime + WebSocket cross-tenant suite green in GitHub Actions |',
+          )
+          text = text.replace(
+              '| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |',
+              '| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | DONE 2026-09-17 — QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics regression green |',
+          )
+          text = text.replace(
+              '| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | IN PROGRESS — status broadcast + JWT refresh/backoff + assigned-waiter realtime/API table scope DONE; communicator cross-tenant/invalid-token regression suite ADDED; runtime execution awaits dependencies |',
+              '| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | DONE 2026-09-17 — status broadcast + JWT refresh/backoff + assigned-waiter scope + communicator cross-tenant/invalid-token regression green |',
+          )
+          roadmap.write_text(text, encoding='utf-8')
+
+          checklist = Path('FEATURE_CHECKLIST.md')
+          text = checklist.read_text(encoding='utf-8')
+          text = text.replace('full cross-endpoint QR→close→analytics regression added + CI gate', 'full cross-endpoint QR→close→analytics regression runtime green + CI gate')
+          text = text.replace('regression added + CI gate; sandbox runtime blocked', 'regression runtime green + CI gate')
+          text = text.replace('tenant regression added', 'tenant regression runtime green')
+          checklist.write_text(text, encoding='utf-8')
+
+          changelog = Path('CHANGELOG_PLAIT.md')
+          old = changelog.read_text(encoding='utf-8')
+          entry = '''# CHANGELOG_PLAIT.md\n\n## 2026-09-17 — Cycle 17\n\n### Что изменено\n- Закрыт оставшийся P0 runtime verification: исправлен stale realtime close regression без ослабления production payment guard.\n- Full backend suite теперь проверяет тот же допустимый payment_requested → closed переход, что и production API.\n- Подтверждены tenant isolation, Kitchen least privilege, assigned-waiter scope, WebSocket invalid/expired JWT denial и отсутствие cross-restaurant event leakage.\n- Подтверждён полный restaurant flow QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics.\n- Frontend typecheck/build включены в тот же verification run.\n- AI_ENABLED=false сохранён; внешние AI API не подключались.\n\n### Результат\nP0 production-regression gates подтверждены runtime-тестами. Следующий приоритет — P1 Onboarding Wizard для первых ресторанов.\n\n'''
+          if old.startswith('# CHANGELOG_PLAIT.md\n'):
+              old = old[len('# CHANGELOG_PLAIT.md\n'):].lstrip('\n')
+          changelog.write_text(entry + old, encoding='utf-8')
           PY
-      - name: Commit patched regression test
+      - name: Commit verified P0 status
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/apps/sessions/tests.py
+          git add ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
           git diff --cached --quiet && exit 0
-          git commit -m "test: align close realtime regression with payment guard"
+          git commit -m "docs: mark P0 runtime regression gates green"
           git push origin HEAD:plait-staging
