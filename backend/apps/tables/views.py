@@ -1,7 +1,8 @@
 import secrets
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, serializers
+from rest_framework import generics, serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -20,11 +21,6 @@ class TableListCreateView(generics.ListCreateAPIView):
     serializer_class = TableSerializer
 
     def get_permissions(self):
-        # FIX: список столов нужен официанту для оформления заказа (выбор
-        # стола в "Новый заказ"), но раньше GET был доступен только
-        # IsRestaurantAdmin — официант получал 403, и селект стола в
-        # NewOrderModal оставался пустым несмотря на настроенные столы.
-        # Создание/удаление столов остаётся только для администратора.
         if self.request.method == 'POST':
             return [IsRestaurantAdmin()]
         return [IsRestaurantStaff()]
@@ -40,21 +36,53 @@ class TableListCreateView(generics.ListCreateAPIView):
         if plan and plan.max_tables is not None:
             current = Table.objects.filter(restaurant_id=rest_id).count()
             if current >= plan.max_tables:
-                raise ValidationError(
-                    {'detail': f'Лимит столов ({plan.max_tables}) для тарифа "{plan.name}" исчерпан.'}
-                )
-        # FIX: Table has unique_together = ('restaurant', 'number'), but
-        # `restaurant` isn't part of TableSerializer's fields (it's set
-        # here via restaurant_id=rest_id), so DRF's automatic
-        # UniqueTogetherValidator never runs. Without this check, creating
-        # a table with a number that already exists for this restaurant
-        # raised an unhandled IntegrityError (500) instead of a clean 400.
+                raise ValidationError({'detail': f'Лимит столов ({plan.max_tables}) для тарифа "{plan.name}" исчерпан.'})
         number = serializer.validated_data.get('number')
         if Table.objects.filter(restaurant_id=rest_id, number=number).exists():
-            raise ValidationError(
-                {'number': f'Стол с номером {number} уже существует.'}
-            )
+            raise ValidationError({'number': f'Стол с номером {number} уже существует.'})
         serializer.save(restaurant_id=rest_id)
+
+
+class TableBulkCreateView(APIView):
+    """Atomically create a numeric range of tables for one restaurant."""
+    permission_classes = [IsRestaurantAdmin]
+    MAX_BATCH = 200
+
+    def post(self, request, rest_id):
+        restaurant = get_object_or_404(Restaurant, id=rest_id)
+        try:
+            start = int(request.data.get('start'))
+            end = int(request.data.get('end'))
+        except (TypeError, ValueError):
+            raise ValidationError({'detail': 'Укажите целые номера start и end.'})
+
+        if start < 1 or end < start:
+            raise ValidationError({'detail': 'Диапазон должен начинаться с 1, а end должен быть не меньше start.'})
+        count = end - start + 1
+        if count > self.MAX_BATCH:
+            raise ValidationError({'detail': f'За один раз можно создать не более {self.MAX_BATCH} столов.'})
+
+        numbers = list(range(start, end + 1))
+        duplicates = list(Table.objects.filter(restaurant_id=rest_id, number__in=numbers).values_list('number', flat=True))
+        if duplicates:
+            raise ValidationError({'duplicates': sorted(duplicates), 'detail': 'В диапазоне уже есть существующие столы.'})
+
+        plan = restaurant.subscription_plan
+        current = Table.objects.filter(restaurant_id=rest_id).count()
+        if plan and plan.max_tables is not None and current + count > plan.max_tables:
+            available = max(plan.max_tables - current, 0)
+            raise ValidationError({'detail': f'Лимит тарифа — {plan.max_tables} столов. Можно добавить ещё {available}.'})
+
+        zone = None
+        zone_id = request.data.get('zone')
+        if zone_id:
+            from apps.zones.models import Zone
+            zone = get_object_or_404(Zone, id=zone_id, restaurant_id=rest_id)
+
+        with transaction.atomic():
+            created = [Table.objects.create(restaurant=restaurant, number=number, zone=zone) for number in numbers]
+
+        return Response({'created': TableSerializer(created, many=True).data, 'count': len(created)}, status=status.HTTP_201_CREATED)
 
 
 class TableDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -63,16 +91,10 @@ class TableDetailView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        rest_id = self.kwargs['rest_id']
-        return Table.objects.filter(restaurant_id=rest_id)
+        return Table.objects.filter(restaurant_id=self.kwargs['rest_id'])
 
 
 class TableRegenerateTokenView(APIView):
-    """
-    POST /api/v1/restaurants/<rest_id>/tables/<pk>/regenerate-token/
-    Rotates the table's QR token, invalidating the previously printed QR code.
-    Admin/manager of the restaurant only (superadmin allowed).
-    """
     permission_classes = [IsRestaurantAdmin]
 
     def post(self, request, rest_id, pk):
@@ -83,37 +105,15 @@ class TableRegenerateTokenView(APIView):
 
 
 class GuestTableInfoView(APIView):
-    """
-    GET /api/v1/guest/<table_token>/
-    Public — no auth required.
-    Returns table + restaurant + categories + available menu items.
-    Used by guest screen.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request, table_token):
-        table = get_object_or_404(
-            Table.objects.select_related('restaurant', 'restaurant__subscription_plan'),
-            token=table_token, is_active=True,
-        )
+        table = get_object_or_404(Table.objects.select_related('restaurant', 'restaurant__subscription_plan'), token=table_token, is_active=True)
         restaurant = table.restaurant
-
-        categories = Category.objects.filter(
-            restaurant=restaurant
-        ).order_by('sort_order')
-
-        menu_items = MenuItem.objects.filter(
-            restaurant=restaurant,
-            is_available=True,
-            is_visible=True,
-        ).select_related('category').order_by('sort_order')
-
+        categories = Category.objects.filter(restaurant=restaurant).order_by('sort_order')
+        menu_items = MenuItem.objects.filter(restaurant=restaurant, is_available=True, is_visible=True).select_related('category').order_by('sort_order')
         return Response({
-            'table': {
-                'id': str(table.id),
-                'number': table.number,
-                'token': table.token,
-            },
+            'table': {'id': str(table.id), 'number': table.number, 'token': table.token},
             'restaurant': RestaurantSerializer(restaurant).data,
             'categories': CategorySerializer(categories, many=True).data,
             'menu_items': MenuItemSerializer(menu_items, many=True).data,
