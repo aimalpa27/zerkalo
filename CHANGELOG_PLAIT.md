@@ -1,40 +1,45 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-17 — Cycle 19
+
+### Что изменено
+- Реализован P1 Bulk tables 1–N end-to-end.
+- Добавлен atomic backend endpoint массового создания диапазона столов; batch либо создаётся полностью, либо не создаётся вовсе.
+- Добавлены проверки диапазона, лимит 200 за операцию, защита от дублей, tenant isolation и учёт max_tables тарифа.
+- Admin/Manager могут массово создавать столы; Waiter/Kitchen и чужой tenant не могут.
+- В Tables UI добавлена мобильная форма «Столы 1–N», optional zone, loading/error states и понятный вывод конфликтующих номеров.
+- После создания список столов перечитывается из backend; существующие QR/print и realtime/session UI продолжают работать поверх новых столов.
+- Добавлены backend regression tests bulk create, duplicate atomic abort, invalid range и role/tenant permissions.
+- AI_ENABLED=false; внешние AI API не подключались.
+
+### Проверка
+- GitHub Actions CI запущен на актуальной plait-staging; окончательный production-ready статус будет выставлен только после green backend + frontend gates.
+- Существующий critical lifecycle regression остаётся CI gate: QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics.
+
+### Результат
+Ресторану больше не нужно вручную создавать 20–50 столов по одному. Plait сокращает время первичной настройки и подготавливает данные для следующего P1 — массового QR PDF export.
+
+### Следующий лучший шаг
+P1: Bulk QR PDF export.
+
 ## 2026-09-17 — Cycle 18
 
 ### Что изменено
 - Реализован P1 Onboarding Wizard поверх существующих restaurant/menu/table/staff API без дублирования CRUD.
 - Admin/Manager видят readiness по реальным данным: профиль ресторана, меню, столы/QR, команда; Waiter/Kitchen мастер не показывается.
-- Каждый незавершённый шаг ведёт прямо в существующий экран настройки; прогресс пересчитывается из store после CRUD/realtime refresh.
-- Go Live заблокирован до выполнения всех обязательных шагов и публикует ресторан через защищённый settings PATCH (`is_public=true`).
-- Добавлены loading/error состояния публикации, retry через повторный Go Live, guest preview и dismiss per restaurant.
-- Mobile UX сделан как bottom sheet, desktop — centered modal; длинный контент скроллится.
-- AI_ENABLED=false сохранён, внешние AI API не подключались.
+- Go Live заблокирован до выполнения обязательных шагов и публикует ресторан через защищённый settings PATCH.
+- Добавлены loading/error состояния, guest preview и mobile bottom sheet.
+- AI_ENABLED=false сохранён.
 
 ### Проверка
-- GitHub Actions frontend: `npm ci` PASS, `npm run typecheck` PASS, `npm run build` PASS.
-- Backend: `manage.py check` PASS, `makemigrations --check --dry-run` PASS, `migrate` PASS.
-- Critical restaurant regression QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics: PASS.
-- Full backend suite: PASS.
-
-### Результат
-Новый ресторан теперь получает понятный путь от пустого аккаунта до опубликованного QR-меню, а Plait получает self-service activation flow для первых 10 ресторанов.
-
-### Следующий лучший шаг
-P1: Bulk tables 1–N — массовое создание столов с валидацией дублей и последующим QR export.
+- Frontend typecheck/build PASS; backend check/migrations/full suite PASS; critical restaurant lifecycle PASS.
 
 ## 2026-09-17 — Cycle 17
 
 ### Что изменено
-- Закрыт оставшийся P0 runtime verification: исправлен stale realtime close regression без ослабления production payment guard.
-- Full backend suite теперь проверяет тот же допустимый payment_requested → closed переход, что и production API.
-- Подтверждены tenant isolation, Kitchen least privilege, assigned-waiter scope, WebSocket invalid/expired JWT denial и отсутствие cross-restaurant event leakage.
-- Подтверждён полный restaurant flow QR → menu → cart/order → admin → kitchen → ready → waiter → served → payment → close → analytics.
-- Frontend typecheck/build включены в тот же verification run.
-- AI_ENABLED=false сохранён; внешние AI API не подключались.
-
-### Результат
-P0 production-regression gates подтверждены runtime-тестами. Следующий приоритет — P1 Onboarding Wizard для первых ресторанов.
+- Закрыт оставшийся P0 runtime verification без ослабления production payment guard.
+- Подтверждены tenant isolation, Kitchen least privilege, assigned-waiter scope и WebSocket isolation.
+- AI_ENABLED=false сохранён.
 
 ## Earlier cycles
-Полная история Cycles 1–16 сохранена в git history до Cycle 18; текущий changelog держит последние production-relevant изменения компактными.
+Полная история Cycles 1–16 сохранена в git history.
