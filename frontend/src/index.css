@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── ТЁМНАЯ ТЕМА (по умолчанию) ── Plait brand palette */
+:root {
+  /* Кофе 70% */
+  --color-bg:    #1A0F08;
+  --color-card:  #251408;
+  --color-card2: #311A0C;
+  /* Шафран 20% — текст */
+  --color-soft:  #FAC775;
+  --color-mid:   rgba(250,199,117,0.65);
+  --color-dim:   rgba(250,199,117,0.40);
+  /* Огонь 8% — основной акцент */
+  --color-gold:  #FF6B1A;
+  /* Мандарин 2% — hover */
+  --color-gold2: #FF9248;
+  /* Границы и стекло */
+  --color-rim:   rgba(255,107,26,0.15);
+  --glass-bg:    rgba(26,15,8,0.88);
+  --glow-color:  rgba(255,107,26,0.18);
+  --glow-border: rgba(255,107,26,0.25);
+  /* Системные */
+  --color-green: #4CAF50;
+  --color-red:   #EF4444;
+  --sidebar-w:   240px;
+}
+
+/* ── СВЕТЛАЯ ТЕМА ── */
+body.theme-light {
+  --color-bg:    #FFFAF5;
+  --color-card:  #FFF5EA;
+  --color-card2: #FDECD6;
+  --color-soft:  #1A0F08;
+  --color-mid:   #5C3820;
+  --color-dim:   #9E6B42;
+  --color-rim:   rgba(255,107,26,0.18);
+  --color-gold:  #FF6B1A;
+  --color-gold2: #FF9248;
+  --glass-bg:    rgba(255,250,245,0.92);
+  --glow-color:  rgba(255,107,26,0.10);
+  --glow-border: rgba(255,107,26,0.22);
+  --color-green: #2E7D32;
+  --color-red:   #C62828;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-soft);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.25s ease, color 0.25s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ── CARD GLOW ── */
+.card-glow {
+  border: 1px solid var(--glow-border);
+  box-shadow:
+    0 0 0 1px var(--glow-border),
+    0 0 16px var(--glow-color),
+    0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card-glow:hover, .card-glow:active {
+  border-color: var(--color-gold);
+  box-shadow:
+    0 0 0 1px var(--color-gold),
+    0 0 28px var(--glow-color),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ── CART BAR ── */
+.cart-bar-wrapper {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 80px;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+/* ── MOBILE ── */
+@media (max-width: 767px) {
+  #root {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+/* ── TABLET / DESKTOP ── */
+@media (min-width: 768px) {
+  #root { max-width: 100%; }
+
+  .app-layout {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    min-height: 100vh;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .sidebar-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 28px 12px 24px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .bottom-nav-mobile { display: none !important; }
+
+  .main-content {
+    min-width: 0;
+    max-width: none;
+    overflow-x: hidden;
+  }
+
+  .restaurant-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .menu-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .cart-bar-wrapper {
+    left: var(--sidebar-w);
+    bottom: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root { --sidebar-w: 280px; }
+  .restaurant-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .menu-grid       { grid-template-columns: repeat(5, 1fr) !important; }
+}
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  /* Огонь-градиент для текста-акцента */
+  .gold-text {
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}

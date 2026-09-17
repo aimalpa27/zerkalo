@@ -5,20 +5,20 @@
 | Title | Priority | Business impact | Complexity | Estimate | Dependencies | Status |
 |---|---|---:|---:|---:|---|---|
 | Direct QR auto-connect | P0 | Critical | S | 1–2h | guest endpoint | DONE 2026-09-16 |
-| Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 — GitHub Actions + local verify script; current sandbox install blocked by DNS |
-| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |
-| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |
-| Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | DONE 2026-09-17 — dedicated role, action scope, frontend auth, tests |
-| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | IN PROGRESS — status broadcast + JWT refresh/backoff + assigned-waiter realtime/API table scope DONE; communicator cross-tenant/invalid-token regression suite ADDED; runtime execution awaits dependencies |
-| Error/loading/empty state audit | P1 | High | M | 1d | core screens | IN PROGRESS — Kitchen board DONE Cycle 13; Admin Sessions/Calls/Analytics resilient loading/error/empty/retry + authoritative closed-history analytics DONE Cycle 14; Guest remains |
-| PWA service worker/update strategy | P1 | High | M | 0.5–1d | Vite | TODO |
+| Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 |
+| Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | DONE 2026-09-17 |
+| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | DONE 2026-09-17 |
+| Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | DONE 2026-09-17 |
+| Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | DONE 2026-09-17 |
+| Error/loading/empty state audit | P1 | High | M | 1d | core screens | DONE 2026-09-17 |
+| PWA service worker/update strategy | P1 | High | M | 0.5–1d | Vite | DONE 2026-09-17 |
 
 ## PHASE 2 — First 10 restaurants
 
 | Title | Priority | Business impact | Complexity | Estimate | Dependencies | Status |
 |---|---|---:|---:|---:|---|---|
-| Onboarding wizard | P1 | Critical | L | 2–4d | restaurant/menu/table/staff APIs | TODO |
-| Bulk tables 1–N | P1 | High | M | 0.5–1d | table API | TODO |
+| Onboarding wizard | P1 | Critical | L | 2–4d | restaurant/menu/table/staff APIs | DONE 2026-09-17 |
+| Bulk tables 1–N | P1 | High | M | 0.5–1d | table API | IMPLEMENTED 2026-09-17 — CI verification running |
 | Bulk QR PDF export | P1 | High | M | 1d | tables | TODO |
 | CSV/XLSX menu import | P1 | High | L | 1–2d | menu CRUD | TODO |
 | Sales Demo Mode | P2 | High | M | 1–2d | stable core | TODO |

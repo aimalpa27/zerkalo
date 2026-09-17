@@ -1,0 +1,127 @@
+{
+  "info": {
+    "name": "iiko Cloud API — Plait",
+    "description": "Тестирование интеграции iiko Cloud API (api-ru.iiko.services).\n\nКак пользоваться:\n1. Импортируй эту коллекцию И окружение iiko.postman_environment.json.\n2. Выбери окружение справа вверху, заполни api_key / app_id / client_secret.\n3. Запусти '1. Auth' — токен сам сохранится в {{token}}, org_id — в {{organization_id}}.\n4. '2. Organizations' → '3. External menus' (сохранит {{external_menu_id}}) → '4. Menu by id'.\n5. '5. Create delivery' — отправка тестового заказа в iikoWeb (заполни поля под свой аккаунт).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://api-ru.iiko.services" },
+    { "key": "token", "value": "" },
+    { "key": "organization_id", "value": "" },
+    { "key": "external_menu_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth (получить токен)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('token получен', () => pm.expect(json.token).to.be.a('string'));",
+              "if (json.token) {",
+              "  pm.collectionVariables.set('token', json.token);",
+              "  pm.environment.set('token', json.token);",
+              "  console.log('token сохранён (JWT ~1 час)');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/v2/access_token", "host": ["{{base_url}}"], "path": ["api", "v2", "access_token"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"appId\": \"{{app_id}}\",\n  \"apiKey\": \"{{api_key}}\",\n  \"clientSecret\": \"{{client_secret}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "2. Organizations",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (json.organizations && json.organizations.length) {",
+              "  pm.collectionVariables.set('organization_id', json.organizations[0].id);",
+              "  pm.environment.set('organization_id', json.organizations[0].id);",
+              "  console.log('organization_id =', json.organizations[0].id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/1/organizations", "host": ["{{base_url}}"], "path": ["api", "1", "organizations"] },
+        "body": { "mode": "raw", "raw": "{\n  \"returnAdditionalInfo\": false\n}" }
+      }
+    },
+    {
+      "name": "3. External menus",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (json.externalMenus && json.externalMenus.length) {",
+              "  pm.collectionVariables.set('external_menu_id', String(json.externalMenus[0].id));",
+              "  pm.environment.set('external_menu_id', String(json.externalMenus[0].id));",
+              "  console.log('external_menu_id =', json.externalMenus[0].id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/2/menu", "host": ["{{base_url}}"], "path": ["api", "2", "menu"] },
+        "body": { "mode": "raw", "raw": "{\n  \"organizationIds\": [\"{{organization_id}}\"]\n}" }
+      }
+    },
+    {
+      "name": "4. Menu by id (позиции меню)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/2/menu/by_id", "host": ["{{base_url}}"], "path": ["api", "2", "menu", "by_id"] },
+        "body": { "mode": "raw", "raw": "{\n  \"organizationIds\": [\"{{organization_id}}\"],\n  \"externalMenuId\": \"{{external_menu_id}}\"\n}" }
+      }
+    },
+    {
+      "name": "5. Create delivery (тестовый заказ, опционально)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/1/deliveries/create", "host": ["{{base_url}}"], "path": ["api", "1", "deliveries", "create"] },
+        "body": { "mode": "raw", "raw": "{\n  \"organizationId\": \"{{organization_id}}\",\n  \"order\": {\n    \"phone\": \"+70000000000\",\n    \"orderServiceType\": \"DeliveryPickUp\",\n    \"items\": [\n      { \"type\": \"Product\", \"productId\": \"<ITEM_ID>\", \"amount\": 1 }\n    ]\n  }\n}" }
+      }
+    }
+  ]
+}
