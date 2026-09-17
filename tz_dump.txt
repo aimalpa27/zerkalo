@@ -1,0 +1,1701 @@
+Полное техническое задание — Django Backend для Plait
+**Для кого:** Junior-Middle Django разработчик
+**Цель:** Построить backend с нуля, полностью заменив Firebase
+**Проект:** Plait — мультиресторанная QR-меню система
+**Живой фронтенд:** https://cafe-879cf.web.app
+Содержание
+[Общая архитектура](#1-общая-архитектура)
+[Замена Firebase](#2-замена-firebase)
+[Структура проекта](#3-структура-проекта)
+[База данных — все модели](#4-база-данных)
+[Redis](#5-redis)
+[Celery — фоновые задачи](#6-celery)
+[Cloudinary — изображения](#7-cloudinary)
+[Полный список API](#8-api-эндпоинты)
+[Аутентификация JWT](#9-аутентификация)
+[Роли пользователей](#10-роли-пользователей)
+[Безопасность](#11-безопасность)
+[WebSocket — реальное время](#12-websocket)
+[Логирование и мониторинг](#13-логирование)
+[Деплой](#14-деплой)
+[План миграции с Firebase](#15-миграция-с-firebase)
+[Зависимости и конфиги](#16-зависимости)
+1. Общая архитектура
+Тип архитектуры
+Модульный монолит — один Django проект, разбитый на независимые приложения (apps). Не микросервисы — это избыточно для данного проекта. Не один файл — это неудобно для команды.
+Схема системы
+┌─────────────────────────────────────────────────────────────┐
+│                        КЛИЕНТЫ                              │
+│  React (гость)    React (admin)    React (кухня)            │
+└────────┬──────────────┬──────────────┬───────────────────── ┘
+         │              │              │
+         │   REST API   │              │   WebSocket
+         ▼              ▼              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     NGINX                                    │
+│  /api/*  → Gunicorn (Django)                                │
+│  /ws/*   → Daphne (Django Channels)                         │
+│  /static → Nginx (статика)                                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│                  DJANGO APPLICATION                          │
+│                                                             │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│   │  auth    │  │restaurants│  │ sessions │  │  calls   │  │
+│   └──────────┘  └──────────┘  └──────────┘  └──────────┘  │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│   │   menu   │  │  tables  │  │  staff   │  │analytics │  │
+│   └──────────┘  └──────────┘  └──────────┘  └──────────┘  │
+│   ┌──────────┐  ┌──────────┐                               │
+│   │ realtime │  │  promos  │                               │
+│   └──────────┘  └──────────┘                               │
+└──────┬──────────────┬──────────────┬───────────────────────┘
+       │              │              │
+       ▼              ▼              ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│ PostgreSQL │ │   Redis    │ │ Cloudinary │
+│   (данные) │ │(кэш+очереди│ │  (фото)    │
+└────────────┘ └─────┬──────┘ └────────────┘
+                     │
+               ┌─────▼──────┐
+               │   Celery   │
+               │  (воркер)  │
+               └────────────┘
+Поток данных (пример: гость делает заказ)
+1. React отправляет POST /api/v1/sessions/
+   с table_token и списком блюд
+
+2. Django views.py получает запрос
+   → валидирует через serializers.py
+   → передаёт в services.py
+
+3. services.py (бизнес-логика):
+   → проверяет table_token в PostgreSQL
+   → ищет открытую сессию стола
+   → создаёт/обновляет TableSession
+   → пересчитывает суммы
+
+4. Django сохраняет в PostgreSQL
+
+5. Django отправляет WS-событие через Redis pub/sub
+   → все подключённые кухни и админы получают уведомление
+
+6. Django возвращает JSON ответ фронтенду
+2. Замена Firebase
+2.1 Firebase Auth → Django Auth + JWT
+Что было в Firebase:
+signInWithEmailAndPassword(auth, email, password)
+onAuthStateChanged(auth, callback)
+createUserWithEmailAndPassword(secondaryAuth, email, pass)
+Что станет в Django:
+# Вход — POST /api/v1/auth/login/
+# Django проверяет email+password, возвращает два токена:
+{
+  "access": "eyJhbGc...",   # живёт 60 минут
+  "refresh": "eyJhbGc..."  # живёт 30 дней
+}
+
+# Каждый запрос к защищённым эндпоинтам:
+Authorization: Bearer eyJhbGc...
+
+# Создание сотрудника — POST /api/v1/staff/
+# Администратор сам создаёт аккаунт, сам остаётся авторизован
+# Никакого secondaryAuth не нужно — это была Firebase-специфика
+Миграция пользователей:
+Экспортировать из Firebase Auth через Firebase Admin SDK
+Пароли Firebase хешированы через scrypt — нельзя перенести напрямую
+Решение: при первом входе после миграции → пользователь вводит пароль заново
+Подробно описано в разделе 15
+2.2 Firestore → PostgreSQL
+Что было (Firestore коллекции):
+restaurants/{id}
+  categories/{id}
+  menuItems/{id}
+  tableSessions/{id}
+  tables/{id}
+  waiterCalls/{id}
+  promos/{id}
+users/{id}
+Что станет (PostgreSQL таблицы):
+restaurants
+categories
+menu_items
+table_sessions
+session_items      ← важно: отдельная таблица, не JSONB массив
+tables
+waiter_calls
+promos
+users
+Главное отличие: в Firestore SessionItem хранился как массив внутри документа TableSession. В PostgreSQL это отдельная таблица session_items с FK на table_sessions. Это правильный реляционный подход.
+2.3 Firebase Storage → Cloudinary
+Что было:
+Загрузка через Firebase Storage SDK
+URL вида firebasestorage.googleapis.com/...
+Что станет:
+# Django принимает файл от фронтенда
+# Загружает в Cloudinary через cloudinary-python SDK
+# Сохраняет URL строкой в поле image_url модели MenuItem
+
+import cloudinary.uploader
+
+result = cloudinary.uploader.upload(
+    file,
+    folder="plait/menu",
+    transformation=[{"width": 800, "crop": "limit", "quality": "auto"}]
+)
+menu_item.image_url = result["secure_url"]
+Фронтенд не меняет логику отображения — URL картинки остаётся URL картинки.
+2.4 Firebase Cloud Functions → Celery
+Что было: Firebase не имел Cloud Functions в этом проекте.
+Что добавляем через Celery:
+3. Структура проекта
+backend/
+│
+├── manage.py
+├── requirements.txt
+├── requirements-dev.txt        ← pytest, debug-toolbar, etc.
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example                ← шаблон переменных (без секретов)
+├── .env                        ← реальные секреты (в .gitignore!)
+│
+├── config/                     ← настройки проекта
+│   ├── __init__.py
+│   ├── settings/
+│   │   ├── __init__.py
+│   │   ├── base.py             ← общие настройки
+│   │   ├── development.py      ← настройки для разработки
+│   │   └── production.py       ← настройки для продакшна
+│   ├── urls.py                 ← главный URL файл
+│   ├── asgi.py                 ← для WebSocket (Channels)
+│   ├── wsgi.py                 ← для обычных HTTP запросов
+│   └── celery.py               ← настройка Celery
+│
+├── apps/                       ← все приложения Django
+│   │
+│   ├── users/                  ← пользователи и авторизация
+│   │   ├── __init__.py
+│   │   ├── models.py           ← CustomUser модель
+│   │   ├── serializers.py      ← LoginSerializer, UserSerializer
+│   │   ├── views.py            ← LoginView, MeView, RegisterView
+│   │   ├── urls.py
+│   │   ├── permissions.py      ← IsAdmin, IsWaiter, IsManager
+│   │   └── admin.py            ← Django Admin регистрация
+│   │
+│   ├── restaurants/            ← рестораны и настройки
+│   │   ├── models.py           ← Restaurant, Promo
+│   │   ├── serializers.py
+│   │   ├── views.py
+│   │   └── urls.py
+│   │
+│   ├── menu/                   ← меню: категории и блюда
+│   │   ├── models.py           ← Category, MenuItem
+│   │   ├── serializers.py
+│   │   ├── views.py
+│   │   ├── urls.py
+│   │   └── tasks.py            ← Celery задача: resize изображений
+│   │
+│   ├── tables/                 ← столы ресторана
+│   │   ├── models.py           ← Table
+│   │   ├── serializers.py
+│   │   ├── views.py
+│   │   └── urls.py
+│   │
+│   ├── sessions/               ← заказы (самое важное приложение)
+│   │   ├── models.py           ← TableSession, SessionItem
+│   │   ├── serializers.py
+│   │   ├── views.py
+│   │   ├── urls.py
+│   │   ├── services.py         ← PlaceOrderService (вся бизнес-логика)
+│   │   └── tasks.py            ← Celery задача: очистка старых сессий
+│   │
+│   ├── calls/                  ← вызовы официанта
+│   │   ├── models.py           ← WaiterCall
+│   │   ├── serializers.py
+│   │   ├── views.py
+│   │   └── urls.py
+│   │
+│   ├── analytics/              ← аналитика выручки
+│   │   ├── views.py            ← только чтение, нет моделей
+│   │   └── urls.py
+│   │
+│   └── realtime/               ← WebSocket (Django Channels)
+│       ├── consumers.py        ← RestaurantConsumer, TableConsumer
+│       ├── routing.py          ← WS маршруты
+│       └── events.py           ← функции отправки событий
+│
+└── utils/                      ← общие утилиты
+    ├── pagination.py
+    ├── exceptions.py           ← кастомные ошибки
+    └── validators.py
+4. База данных
+4.1 Кастомная модель пользователя
+# apps/users/models.py
+import uuid
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.db import models
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Email обязателен')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('role', 'admin')
+        return self.create_user(email, password, **extra_fields)
+
+
+class User(AbstractBaseUser):
+    ROLES = [
+        ('admin',   'Администратор'),
+        ('manager', 'Менеджер'),
+        ('waiter',  'Официант'),
+        ('cashier', 'Кассир'),
+    ]
+
+    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email          = models.EmailField(unique=True)
+    name           = models.CharField(max_length=255)
+    role           = models.CharField(max_length=10, choices=ROLES, default='waiter')
+    restaurant     = models.ForeignKey(
+                         'restaurants.Restaurant',
+                         on_delete=models.SET_NULL,
+                         null=True, blank=True,
+                         related_name='staff'
+                     )
+    assigned_tables = models.ManyToManyField(
+                         'tables.Table',
+                         blank=True,
+                         related_name='assigned_waiters'
+                      )
+    is_active      = models.BooleanField(default=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+
+    USERNAME_FIELD  = 'email'
+    REQUIRED_FIELDS = ['name']
+    objects         = UserManager()
+
+    class Meta:
+        db_table = 'users'
+        indexes  = [models.Index(fields=['restaurant', 'role'])]
+
+    def __str__(self):
+        return f'{self.name} ({self.email})'
+
+    @property
+    def is_admin_or_manager(self):
+        return self.role in ('admin', 'manager')
+Важно: Добавить в settings.py:
+AUTH_USER_MODEL = 'users.User'
+4.2 Restaurant
+# apps/restaurants/models.py
+class Restaurant(models.Model):
+    id                      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name                    = models.CharField(max_length=255)
+    slug                    = models.SlugField(max_length=100, unique=True)
+    address                 = models.TextField(blank=True)
+    working_hours           = models.CharField(max_length=255, blank=True)
+    rating                  = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True)
+    tags                    = models.JSONField(default=list, blank=True)  # ["coffee", "asian"]
+    cover_image_url         = models.URLField(blank=True)
+    latitude                = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude               = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    service_charge_percent  = models.PositiveIntegerField(default=10)
+    allow_waiter_close      = models.BooleanField(default=False)
+    kaspi_pay_url           = models.URLField(blank=True)   # ссылка для Kaspi QR оплаты
+    panorama_url            = models.URLField(blank=True)
+    is_public               = models.BooleanField(default=True)
+
+    created_at              = models.DateTimeField(auto_now_add=True)
+    updated_at              = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'restaurants'
+        indexes  = [models.Index(fields=['slug']), models.Index(fields=['is_public'])]
+
+    def __str__(self):
+        return self.name
+4.3 Category
+class Category(models.Model):
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='categories')
+    name       = models.CharField(max_length=255)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table  = 'categories'
+        ordering  = ['sort_order']
+        indexes   = [models.Index(fields=['restaurant', 'sort_order'])]
+
+    def __str__(self):
+        return f'{self.restaurant.name} → {self.name}'
+4.4 MenuItem
+class MenuItem(models.Model):
+    BADGES   = [('hit', 'Хит'), ('new', 'Новинка'), ('sale', 'Скидка')]
+    STATIONS = [('kitchen', 'Кухня'), ('bar', 'Бар')]
+
+    id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant          = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='menu_items')
+    category            = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
+    name                = models.CharField(max_length=255)
+    description         = models.TextField(blank=True)
+    price               = models.DecimalField(max_digits=10, decimal_places=2)
+    image_url           = models.URLField(blank=True)          # URL из Cloudinary
+    emoji               = models.CharField(max_length=10, blank=True)
+    weight              = models.CharField(max_length=50, blank=True)  # "250г", "500мл"
+    is_available        = models.BooleanField(default=True)    # стоп-лист
+    is_visible          = models.BooleanField(default=True)    # скрыть из меню
+    badge               = models.CharField(max_length=10, choices=BADGES, blank=True)
+    discount_percent    = models.PositiveIntegerField(default=0)
+    preparation_station = models.CharField(max_length=10, choices=STATIONS, default='kitchen')
+    sort_order          = models.PositiveIntegerField(default=0)
+
+    created_at          = models.DateTimeField(auto_now_add=True)
+    updated_at          = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'menu_items'
+        ordering = ['sort_order']
+        indexes  = [
+            models.Index(fields=['restaurant', 'is_available', 'is_visible']),
+            models.Index(fields=['category']),
+        ]
+
+    @property
+    def final_price(self):
+        """Цена с учётом скидки"""
+        if self.discount_percent > 0:
+            return self.price - (self.price * self.discount_percent // 100)
+        return self.price
+4.5 Table
+import secrets
+
+class Table(models.Model):
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables')
+    number     = models.PositiveIntegerField()
+    token      = models.CharField(max_length=64, unique=True, default=secrets.token_urlsafe)
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table    = 'tables'
+        unique_together = [('restaurant', 'number')]   # номер стола уникален внутри ресторана
+        indexes     = [models.Index(fields=['token'])] # быстрый поиск по токену (гость)
+
+    @property
+    def qr_url(self):
+        """URL для QR кода"""
+        return f"https://cafe-plait.web.app/?slug={self.restaurant.slug}&token={self.token}"
+4.6 TableSession
+class TableSession(models.Model):
+    STATUSES = [
+        ('open',               'Открыт'),
+        ('awaiting_payment',   'Ожидает оплату'),
+        ('payment_requested',  'Запрошена оплата'),
+        ('closed',             'Закрыт'),
+    ]
+    PAYMENT_METHODS = [('cash', 'Наличные'), ('card', 'Карта')]
+
+    id                     = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant             = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='sessions')
+    table                  = models.ForeignKey(Table, on_delete=models.SET_NULL, null=True, related_name='sessions')
+    table_number           = models.PositiveIntegerField()          # денормализовано — стол могут удалить
+    table_token            = models.CharField(max_length=64)        # денормализовано
+    status                 = models.CharField(max_length=20, choices=STATUSES, default='open')
+    subtotal_amount        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    service_charge_percent = models.PositiveIntegerField(default=10)
+    service_charge_amount  = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_amount           = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_method         = models.CharField(max_length=10, choices=PAYMENT_METHODS, blank=True)
+    created_at             = models.DateTimeField(auto_now_add=True)
+    updated_at             = models.DateTimeField(auto_now=True)
+    closed_at              = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'table_sessions'
+        indexes  = [
+            models.Index(fields=['restaurant', 'status']),       # поиск открытых сессий
+            models.Index(fields=['table_token', 'status']),      # гость ищет свою сессию
+            models.Index(fields=['restaurant', 'closed_at']),    # аналитика
+        ]
+
+    def recalculate_totals(self):
+        """Пересчитать суммы на основе SessionItem"""
+        items = self.items.exclude(status='cancelled')
+        subtotal = sum(item.price * item.quantity for item in items)
+        svc = subtotal * self.service_charge_percent // 100
+        self.subtotal_amount = subtotal
+        self.service_charge_amount = svc
+        self.total_amount = subtotal + svc
+        self.save(update_fields=['subtotal_amount', 'service_charge_amount', 'total_amount', 'updated_at'])
+4.7 SessionItem
+class SessionItem(models.Model):
+    STATUSES = [
+        ('pending',          'Ожидает'),
+        ('waiter_confirmed', 'Принят официантом'),
+        ('sent_to_kitchen',  'Отправлен на кухню'),
+        ('sent_to_bar',      'Отправлен в бар'),
+        ('ready',            'Готово'),
+        ('served',           'Подано'),
+        ('delivered',        'Доставлено'),
+        ('cancelled',        'Отменён'),
+    ]
+    ADDED_BY = [('guest', 'Гость'), ('waiter', 'Официант')]
+
+    id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session             = models.ForeignKey(TableSession, on_delete=models.CASCADE, related_name='items')
+    menu_item           = models.ForeignKey(MenuItem, on_delete=models.SET_NULL, null=True, blank=True)
+    item_name           = models.CharField(max_length=255)    # денормализовано
+    price               = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity            = models.PositiveIntegerField()
+    status              = models.CharField(max_length=20, choices=STATUSES, default='pending')
+    preparation_station = models.CharField(max_length=10, default='kitchen')
+    note                = models.TextField(blank=True)         # "без лука", "без острого"
+    added_by            = models.CharField(max_length=10, choices=ADDED_BY, default='guest')
+    created_at          = models.DateTimeField(auto_now_add=True)
+    ready_at            = models.DateTimeField(null=True, blank=True)
+    served_at           = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'session_items'
+        indexes  = [
+            models.Index(fields=['session', 'status']),
+            models.Index(fields=['session', 'preparation_station']),
+        ]
+4.8 WaiterCall
+class WaiterCall(models.Model):
+    STATUSES = [('new', 'Новый'), ('accepted', 'Принят'), ('closed', 'Закрыт')]
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant   = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='waiter_calls')
+    table        = models.ForeignKey(Table, on_delete=models.SET_NULL, null=True, blank=True)
+    table_number = models.PositiveIntegerField()
+    table_token  = models.CharField(max_length=64)
+    status       = models.CharField(max_length=10, choices=STATUSES, default='new')
+    reason       = models.CharField(max_length=255, blank=True)   # "Принесите меню"
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'waiter_calls'
+        indexes  = [models.Index(fields=['restaurant', 'status'])]
+4.9 Promo
+class Promo(models.Model):
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant  = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='promos')
+    title       = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    valid_until = models.DateField(null=True, blank=True)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'promos'
+        indexes  = [models.Index(fields=['restaurant', 'is_active'])]
+4.10 Схема связей
+Restaurant ──< Category
+Restaurant ──< MenuItem >── Category
+Restaurant ──< Table
+Restaurant ──< TableSession
+Restaurant ──< WaiterCall
+Restaurant ──< Promo
+Restaurant ──< User (staff)
+
+TableSession ──< SessionItem >── MenuItem
+Table ──< TableSession
+Table >──< User (assigned_tables, M2M)
+5. Redis
+Установка и настройка
+# config/settings/base.py
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/0"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    }
+}
+
+# Celery через Redis
+CELERY_BROKER_URL = env("REDIS_URL")
+CELERY_RESULT_BACKEND = env("REDIS_URL")
+
+# Django Channels через Redis
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [env("REDIS_URL")]},
+    }
+}
+5.1 Кэширование меню
+Меню ресторана не меняется каждую секунду. Кэшируем на 5 минут:
+# apps/menu/views.py
+from django.core.cache import cache
+
+class MenuItemListView(generics.ListAPIView):
+    serializer_class = MenuItemSerializer
+
+    def get_queryset(self):
+        rest_id = self.kwargs['rest_id']
+        cache_key = f"menu:{rest_id}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        queryset = MenuItem.objects.filter(
+            restaurant_id=rest_id,
+            is_available=True,
+            is_visible=True
+        ).select_related('category').order_by('sort_order')
+
+        cache.set(cache_key, queryset, timeout=300)  # 5 минут
+        return queryset
+
+
+# Инвалидация при изменении блюда:
+def invalidate_menu_cache(restaurant_id):
+    cache.delete(f"menu:{restaurant_id}")
+5.2 Rate Limiting (защита от спама)
+# utils/throttling.py
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
+class LoginRateThrottle(AnonRateThrottle):
+    """Максимум 5 попыток входа в минуту с одного IP"""
+    rate = '5/min'
+    scope = 'login'
+
+class WaiterCallThrottle(AnonRateThrottle):
+    """Гость не может спамить вызовами — 3 раза в минуту"""
+    rate = '3/min'
+    scope = 'waiter_call'
+
+class PlaceOrderThrottle(AnonRateThrottle):
+    """Не более 10 заказов в минуту с одного IP"""
+    rate = '10/min'
+    scope = 'place_order'
+5.3 TTL стратегии
+6. Celery
+Настройка
+# config/celery.py
+import os
+from celery import Celery
+from celery.schedules import crontab
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+
+app = Celery('plait')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+
+# Периодические задачи
+app.conf.beat_schedule = {
+    # Удаление старых закрытых сессий (старше 90 дней)
+    'cleanup-old-sessions': {
+        'task': 'apps.sessions.tasks.cleanup_old_sessions',
+        'schedule': crontab(hour=3, minute=0),   # каждый день в 3:00
+    },
+}
+6.1 Задача: ресайз изображения после загрузки
+# apps/menu/tasks.py
+@app.task
+def optimize_menu_image(menu_item_id: str):
+    """
+    После загрузки фото — создать оптимизированную версию через Cloudinary
+    и обновить URL в БД
+    """
+    item = MenuItem.objects.get(id=menu_item_id)
+    if not item.image_url:
+        return
+
+    # Cloudinary позволяет трансформировать через параметры в URL
+    # Меняем URL на оптимизированный
+    optimized_url = item.image_url.replace(
+        '/upload/',
+        '/upload/w_800,h_600,c_fill,q_auto,f_webp/'
+    )
+    MenuItem.objects.filter(id=menu_item_id).update(image_url=optimized_url)
+
+    # Инвалидируем кэш меню
+    from django.core.cache import cache
+    cache.delete(f"menu:{item.restaurant_id}")
+6.3 Задача: очистка старых данных
+# apps/sessions/tasks.py
+from django.utils import timezone
+from datetime import timedelta
+
+@app.task
+def cleanup_old_sessions():
+    """Удалить закрытые сессии старше 90 дней"""
+    cutoff = timezone.now() - timedelta(days=90)
+    deleted, _ = TableSession.objects.filter(
+        status='closed',
+        closed_at__lt=cutoff
+    ).delete()
+
+    print(f"[Cleanup] Удалено {deleted} старых сессий")
+7. Cloudinary
+Настройка
+# config/settings/base.py
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name = env('CLOUDINARY_CLOUD_NAME'),
+    api_key    = env('CLOUDINARY_API_KEY'),
+    api_secret = env('CLOUDINARY_API_SECRET'),
+    secure     = True
+)
+Загрузка изображения блюда
+# apps/menu/views.py
+import cloudinary.uploader
+
+class MenuItemImageUploadView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrManager]
+
+    def post(self, request, rest_id, item_id):
+        item = get_object_or_404(MenuItem, id=item_id, restaurant_id=rest_id)
+
+        if 'image' not in request.FILES:
+            return Response({'error': 'Файл не передан'}, status=400)
+
+        file = request.FILES['image']
+
+        # Проверка типа файла
+        if not file.content_type.startswith('image/'):
+            return Response({'error': 'Только изображения'}, status=400)
+
+        # Проверка размера (максимум 10MB)
+        if file.size > 10 * 1024 * 1024:
+            return Response({'error': 'Файл слишком большой (максимум 10MB)'}, status=400)
+
+        # Загрузка в Cloudinary
+        result = cloudinary.uploader.upload(
+            file,
+            folder=f"plait/{rest_id}/menu",
+            public_id=str(item_id),         # перезапишет старое фото
+            overwrite=True,
+            transformation=[
+                {'width': 800, 'height': 600, 'crop': 'fill'},
+                {'quality': 'auto', 'fetch_format': 'auto'}
+            ]
+        )
+
+        # Сохраняем URL в БД
+        item.image_url = result['secure_url']
+        item.save(update_fields=['image_url', 'updated_at'])
+
+        # Запускаем Celery задачу для дополнительной оптимизации
+        from .tasks import optimize_menu_image
+        optimize_menu_image.delay(str(item.id))
+
+        return Response({'image_url': item.image_url})
+Оптимизация через URL параметры
+Оригинал:
+https://res.cloudinary.com/plait/image/upload/plait/rest123/menu/item456.jpg
+
+Превью 400x300:
+https://res.cloudinary.com/plait/image/upload/w_400,h_300,c_fill,q_auto,f_webp/plait/...
+
+Миниатюра 100x100:
+https://res.cloudinary.com/plait/image/upload/w_100,h_100,c_thumb,q_auto/plait/...
+Фронтенд использует один и тот же базовый URL, добавляя параметры для нужного размера.
+8. API Эндпоинты
+Base URL: https://api.plait.kz/api/v1/
+Авторизация: Authorization: Bearer {access_token}
+🔓 = публичный (без токена)
+🔒 = нужен JWT токен
+👑 = только admin/manager
+8.1 Авторизация
+POST /auth/login/ 🔓
+// Request
+{
+  "email": "admin@plait.kz",
+  "password": "secret123"
+}
+
+// Response 200
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "admin@plait.kz",
+    "name": "Алибек",
+    "role": "admin",
+    "restaurant_id": "550e8400-e29b-41d4-a716-446655440001"
+  }
+}
+
+// Response 401
+{ "error": "Неверный email или пароль" }
+POST /auth/refresh/ 🔓
+// Request
+{ "refresh": "eyJ..." }
+
+// Response 200
+{ "access": "eyJ..." }
+GET /auth/me/ 🔒
+// Response 200
+{
+  "id": "uuid",
+  "email": "admin@plait.kz",
+  "name": "Алибек",
+  "role": "admin",
+  "restaurant": { "id": "uuid", "name": "Alpa Cafe", "slug": "alpa-cafe" },
+  "assigned_tables": []
+}
+PATCH /auth/me/ 🔒
+// Request (любые поля опциональны)
+{ "name": "Алибек Сатов", "password": "newpassword123" }
+
+// Response 200
+{ "id": "uuid", "name": "Алибек Сатов", "email": "admin@plait.kz" }
+8.2 Рестораны
+GET /restaurants/ 🔓
+[
+  {
+    "id": "uuid",
+    "name": "Alpa Cafe",
+    "slug": "alpa-cafe",
+    "address": "ул. Абая 10",
+    "working_hours": "08:00 - 22:00",
+    "cover_image_url": "https://res.cloudinary.com/...",
+    "service_charge_percent": 10,
+    "kaspi_pay_url": "https://kaspi.kz/pay/AlpaCafe"
+  }
+]
+GET /restaurants/{id}/ 🔓
+GET /restaurants/by-slug/{slug}/ 🔓
+Используется фронтендом при сканировании QR.
+PATCH /restaurants/{id}/ 🔒👑
+// Request
+{
+  "service_charge_percent": 12,
+  "allow_waiter_close": true,
+  "kaspi_pay_url": "https://kaspi.kz/pay/AlpaCafe"
+}
+8.3 Категории
+GET /restaurants/{restid}/categories/ 🔓
+[
+  { "id": "uuid", "name": "Горячие блюда", "sort_order": 1 },
+  { "id": "uuid", "name": "Напитки", "sort_order": 2 }
+]
+POST /restaurants/{restid}/categories/ 🔒👑
+// Request
+{ "name": "Десерты", "sort_order": 3 }
+PUT /restaurants/{restid}/categories/{id}/ 🔒👑
+DELETE /restaurants/{restid}/categories/{id}/ 🔒👑
+8.4 Меню (блюда)
+GET /restaurants/{restid}/menu/ 🔓
+[
+  {
+    "id": "uuid",
+    "name": "Бешбармак",
+    "description": "Традиционное блюдо с мясом",
+    "price": "2500.00",
+    "final_price": "2000.00",
+    "discount_percent": 20,
+    "image_url": "https://res.cloudinary.com/...",
+    "weight": "500г",
+    "badge": "hit",
+    "preparation_station": "kitchen",
+    "category": { "id": "uuid", "name": "Горячие блюда" },
+    "is_available": true,
+    "sort_order": 1
+  }
+]
+Для гостей: только is_available=True и is_visible=True.
+Для admin (с токеном): все блюда.
+POST /restaurants/{restid}/menu/ 🔒👑
+// Request
+{
+  "name": "Лагман",
+  "description": "Узбекское блюдо",
+  "price": 1800,
+  "category_id": "uuid",
+  "preparation_station": "kitchen",
+  "is_available": true,
+  "sort_order": 5
+}
+PATCH /restaurants/{restid}/menu/{id}/ 🔒
+// Официант переключает стоп-лист:
+{ "is_available": false }
+
+// Администратор меняет цену:
+{ "price": 2000 }
+DELETE /restaurants/{restid}/menu/{id}/ 🔒👑
+POST /restaurants/{restid}/menu/{id}/upload-image/ 🔒👑
+Content-Type: multipart/form-data
+Body: image=<файл>
+
+Response 200:
+{ "image_url": "https://res.cloudinary.com/plait/..." }
+8.5 Столы
+GET /restaurants/{restid}/tables/ 🔒
+[
+  {
+    "id": "uuid",
+    "number": 5,
+    "token": "abc123xyz...",
+    "is_active": true,
+    "qr_url": "https://cafe-plait.web.app/?slug=alpa-cafe&token=abc123xyz"
+  }
+]
+POST /restaurants/{restid}/tables/ 🔒👑
+// Request
+{ "number": 6 }
+
+// Response 201
+{
+  "id": "uuid",
+  "number": 6,
+  "token": "автоматически-сгенерирован",
+  "qr_url": "https://cafe-plait.web.app/?slug=alpa-cafe&token=..."
+}
+DELETE /restaurants/{restid}/tables/{id}/ 🔒👑
+8.6 Сессии (заказы) — самая важная часть
+GET /restaurants/{restid}/sessions/ 🔒
+Параметры:
+?status=open              — только открытые
+?from=2024-01-01          — с даты (для аналитики)
+?to=2024-01-31            — по дату
+?table_number=5           — конкретный стол
+
+Response 200:
+[
+  {
+    "id": "uuid",
+    "table_number": 5,
+    "status": "open",
+    "items": [
+      {
+        "id": "uuid",
+        "item_name": "Бешбармак",
+        "price": "2000.00",
+        "quantity": 2,
+        "status": "pending",
+        "preparation_station": "kitchen",
+        "note": "без лука",
+        "added_by": "guest"
+      }
+    ],
+    "subtotal_amount": "4000.00",
+    "service_charge_percent": 10,
+    "service_charge_amount": "400.00",
+    "total_amount": "4400.00",
+    "payment_method": "cash",
+    "created_at": "2024-01-15T12:00:00Z",
+    "updated_at": "2024-01-15T12:05:00Z"
+  }
+]
+POST /sessions/ 🔓 ← Гость делает заказ
+// Request
+{
+  "table_token": "abc123xyz...",
+  "payment_method": "cash",
+  "items": [
+    { "menu_item_id": "uuid", "quantity": 2, "note": "без лука" },
+    { "menu_item_id": "uuid", "quantity": 1, "note": "" }
+  ]
+}
+
+// Response 201
+{
+  "id": "uuid",
+  "table_number": 5,
+  "status": "open",
+  "items": [...],
+  "total_amount": "4400.00"
+}
+
+// Response 400
+{ "error": "Блюдо 'Лагман' недоступно (стоп-лист)" }
+
+// Response 404
+{ "error": "Стол не найден" }
+GET /sessions/by-table/{tabletoken}/ 🔓 ← Гость видит свой счёт
+Возвращает активную сессию (open/awaiting_payment/payment_requested) для этого стола.
+POST /sessions/by-table/{tabletoken}/request-payment/ 🔓 ← Гость просит счёт
+Меняет статус: open → awaiting_payment
+PATCH /restaurants/{restid}/sessions/{id}/ 🔒
+// Официант закрывает сессию:
+{ "status": "closed" }
+
+// Запрос оплаты от официанта:
+{ "status": "payment_requested" }
+POST /restaurants/{restid}/sessions/{id}/items/ 🔒 ← Официант добавляет блюда
+// Request
+{
+  "added_by": "waiter",
+  "items": [
+    { "menu_item_id": "uuid", "quantity": 1, "note": "дополнительный соус" }
+  ]
+}
+PATCH /restaurants/{restid}/sessions/{sessionid}/items/{itemid}/ 🔒 ← Кухня обновляет статус
+// Request
+{ "status": "ready" }
+
+// или официант подал:
+{ "status": "served" }
+POST /restaurants/{restid}/sessions/{id}/mark-served/ 🔒
+Помечает все ready позиции как served одним запросом.
+8.7 Вызовы официанта
+POST /waiter-calls/ 🔓 ← Гость зовёт официанта
+// Request
+{
+  "table_token": "abc123xyz...",
+  "reason": "Запросить счёт"
+}
+
+// Response 201
+{ "id": "uuid", "status": "new", "reason": "Запросить счёт" }
+GET /restaurants/{restid}/waiter-calls/ 🔒
+?status=new   — только новые
+PATCH /restaurants/{restid}/waiter-calls/{id}/ 🔒
+{ "status": "accepted" }
+8.8 Персонал
+GET /restaurants/{restid}/staff/ 🔒👑
+POST /restaurants/{restid}/staff/ 🔒👑
+// Request
+{
+  "name": "Айдана",
+  "email": "aidana@alpa.kz",
+  "password": "staff123",
+  "role": "waiter"
+}
+
+// Response 201
+{
+  "id": "uuid",
+  "name": "Айдана",
+  "email": "aidana@alpa.kz",
+  "role": "waiter",
+  "assigned_tables": []
+}
+PATCH /restaurants/{restid}/staff/{id}/ 🔒👑
+// Назначить столы официанту:
+{ "assigned_table_ids": ["uuid1", "uuid2"] }
+DELETE /restaurants/{restid}/staff/{id}/ 🔒👑
+8.9 Аналитика
+GET /restaurants/{restid}/analytics/ 🔒👑
+Параметры:
+?period=today|week|month|custom
+?from=2024-01-01   (обязательно если period=custom)
+?to=2024-01-31     (обязательно если period=custom)
+
+Response 200:
+{
+  "period": "today",
+  "total_revenue": 125000,
+  "subtotal": 113636,
+  "service_charge_total": 11364,
+  "sessions_count": 24,
+  "avg_check": 5208,
+  "top_items": [
+    { "name": "Бешбармак", "quantity": 18, "revenue": 45000 },
+    { "name": "Лагман",    "quantity": 12, "revenue": 24000 }
+  ],
+  "daily_chart": [
+    { "date": "2024-01-09", "revenue": 0 },
+    { "date": "2024-01-10", "revenue": 87000 }
+  ]
+}
+9. Аутентификация
+Схема JWT
+ВХОД:
+POST /auth/login/ → { access (60 мин), refresh (30 дней) }
+                           ↓
+Фронтенд сохраняет токены в localStorage
+
+ОБЫЧНЫЙ ЗАПРОС:
+Authorization: Bearer {access}
+                    ↓
+Django декодирует токен → находит пользователя → выполняет запрос
+
+ТОКЕН ИСТЁК:
+401 Unauthorized
+    ↓
+Фронтенд автоматически: POST /auth/refresh/ с refresh токеном
+    ↓
+Получает новый access токен и повторяет запрос
+
+ВЫХОД:
+Фронтенд удаляет токены из localStorage
+(опционально: POST /auth/logout/ для blacklist refresh токена)
+Настройка
+# config/settings/base.py
+from datetime import timedelta
+
+INSTALLED_APPS = [
+    ...
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # для logout
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS':  True,      # выдавать новый refresh при обновлении
+    'BLACKLIST_AFTER_ROTATION': True,    # старый refresh становится невалидным
+    'ALGORITHM': 'HS256',
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+Кастомный payload токена
+# apps/users/serializers.py
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Добавляем данные в payload — фронтенд их видит без запроса к /me/
+        token['name'] = user.name
+        token['role'] = user.role
+        token['restaurant_id'] = str(user.restaurant_id) if user.restaurant_id else None
+        return token
+10. Роли пользователей
+Матрица прав
+# apps/users/permissions.py
+from rest_framework.permissions import BasePermission
+
+class IsAdminOrManager(BasePermission):
+    """Только admin и manager"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in ('admin', 'manager')
+
+class IsAdminOnly(BasePermission):
+    """Только admin"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'admin'
+
+class IsStaff(BasePermission):
+    """Любой сотрудник (admin, manager, waiter, cashier)"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+class IsRestaurantMember(BasePermission):
+    """Сотрудник принадлежит к ресторану из URL"""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        rest_id = view.kwargs.get('rest_id')
+        return str(request.user.restaurant_id) == rest_id
+*allow_waiter_close — настройка ресторана, разрешающая официанту закрывать счёт.
+11. Безопасность
+11.1 CORS
+# config/settings/base.py
+INSTALLED_APPS = [..., 'corsheaders']
+MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware', ...]
+
+CORS_ALLOWED_ORIGINS = [
+    "https://cafe-879cf.web.app",     # Firebase Hosting (продакшн)
+    "http://localhost:5173",           # Vite dev server (разработка)
+]
+
+CORS_ALLOW_CREDENTIALS = True   # нужно для cookies если используете
+
+# НЕ делать так в продакшне:
+# CORS_ALLOW_ALL_ORIGINS = True
+11.2 Защита от SQL injection
+Django ORM автоматически экранирует все параметры. Никогда не использовать raw() с пользовательскими данными без параметризации:
+# ❌ ОПАСНО:
+User.objects.raw(f"SELECT * FROM users WHERE email = '{email}'")
+
+# ✅ БЕЗОПАСНО — ORM сам экранирует:
+User.objects.filter(email=email)
+
+# ✅ БЕЗОПАСНО — если raw нужен, только параметризованный:
+User.objects.raw("SELECT * FROM users WHERE email = %s", [email])
+11.3 Rate Limiting
+# config/settings/base.py
+REST_FRAMEWORK = {
+    ...
+    'DEFAULT_THROTTLE_RATES': {
+        'login':       '5/min',
+        'waiter_call': '3/min',
+        'place_order': '10/min',
+        'anon':        '100/hour',
+        'user':        '1000/hour',
+    }
+}
+11.4 Валидация tabletoken
+# apps/sessions/services.py
+class PlaceOrderService:
+    def validate_token(self, token: str) -> Table:
+        try:
+            table = Table.objects.select_related('restaurant').get(
+                token=token,
+                is_active=True
+            )
+            return table
+        except Table.DoesNotExist:
+            raise ValidationError("Недействительный токен стола")
+11.5 Дополнительные настройки
+# config/settings/production.py
+
+# Только HTTPS
+SECURE_SSL_REDIRECT = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+# Защита cookies
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+# Скрыть информацию о версии Django
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Логировать ошибки на email (настраивается через ADMINS)
+ADMINS = [('Dev Team', 'dev@plait.kz')]
+12. WebSocket
+Настройка Django Channels
+# config/asgi.py
+import os
+from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from apps.realtime.routing import websocket_urlpatterns
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(websocket_urlpatterns)
+    ),
+})
+# apps/realtime/routing.py
+from django.urls import re_path
+from . import consumers
+
+websocket_urlpatterns = [
+    re_path(r'ws/restaurant/(?P<rest_id>[^/]+)/$', consumers.RestaurantConsumer.as_asgi()),
+    re_path(r'ws/table/(?P<table_token>[^/]+)/$',  consumers.TableConsumer.as_asgi()),
+]
+Консьюмер для ресторана (кухня + администратор)
+# apps/realtime/consumers.py
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class RestaurantConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.rest_id = self.scope['url_route']['kwargs']['rest_id']
+        self.group_name = f"restaurant_{self.rest_id}"
+
+        # Аутентификация через токен в query string
+        token = self.scope['query_string'].decode().split('token=')[-1]
+        try:
+            payload = AccessToken(token)
+            user = await User.objects.aget(id=payload['user_id'])
+            if str(user.restaurant_id) != self.rest_id:
+                await self.close(code=4003)   # Нет доступа к этому ресторану
+                return
+        except Exception:
+            await self.close(code=4001)        # Невалидный токен
+            return
+
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        """Обработка сообщений от клиента (кухня меняет статус через WS)"""
+        data = json.loads(text_data)
+
+        if data['type'] == 'mark_item_ready':
+            await self.handle_mark_ready(data['session_id'], data['item_id'])
+
+    # Получение событий от других частей Django и пересылка клиенту
+    async def sessions_update(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def new_order(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def waiter_call(self, event):
+        await self.send(text_data=json.dumps(event))
+Отправка события из любого места Django
+# apps/realtime/events.py
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+def broadcast_new_order(rest_id: str, session_data: dict):
+    """
+    Вызывается из PlaceOrderService после создания заказа.
+    Все подключённые кухни и администраторы мгновенно получат уведомление.
+    """
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"restaurant_{rest_id}",
+        {
+            "type": "new_order",
+            "session": session_data
+        }
+    )
+
+def broadcast_item_status(rest_id: str, session_id: str, item_id: str, status: str):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"restaurant_{rest_id}",
+        {
+            "type": "item_status_update",
+            "session_id": session_id,
+            "item_id": item_id,
+            "status": status
+        }
+    )
+13. Логирование
+# config/settings/base.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': 'logs/django.log',
+            'maxBytes': 1024 * 1024 * 10,   # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+        },
+        'apps': {                          # все наши приложения
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+Что логировать обязательно
+import logging
+logger = logging.getLogger('apps.sessions')
+
+class PlaceOrderService:
+    def execute(self, table_token, items, payment_method):
+        logger.info(f"[PlaceOrder] table_token={table_token[:8]}... items_count={len(items)}")
+        try:
+            session = self._create_or_update_session(...)
+            logger.info(f"[PlaceOrder] SUCCESS session_id={session.id} total={session.total_amount}")
+            return session
+        except Exception as e:
+            logger.error(f"[PlaceOrder] FAILED table_token={table_token[:8]}... error={e}", exc_info=True)
+            raise
+Мониторинг (Sentry)
+# requirements.txt
+sentry-sdk[django]
+
+# config/settings/production.py
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+
+sentry_sdk.init(
+    dsn=env('SENTRY_DSN'),
+    integrations=[DjangoIntegration(), CeleryIntegration()],
+    traces_sample_rate=0.2,     # отслеживать 20% запросов для производительности
+    send_default_pii=False,     # не отправлять личные данные
+)
+Sentry бесплатен для небольших проектов. Регистрация: sentry.io
+14. Деплой
+docker-compose.yml
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: plait
+      POSTGRES_USER: plait
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plait"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  django:
+    build: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./logs:/app/logs
+
+  daphne:                          # для WebSocket
+    build: .
+    command: daphne config.asgi:application --bind 0.0.0.0 --port 8001
+    env_file: .env
+    depends_on: [db, redis]
+
+  celery-worker:
+    build: .
+    command: celery -A config worker -l info -Q default
+    env_file: .env
+    depends_on: [db, redis]
+
+  celery-beat:                     # планировщик периодических задач
+    build: .
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env
+    depends_on: [db, redis]
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on: [django, daphne]
+
+volumes:
+  postgres_data:
+  redis_data:
+Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Зависимости системы
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python зависимости
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Код приложения
+COPY . .
+
+# Создание папки логов
+RUN mkdir -p logs
+
+# Сбор статики
+RUN python manage.py collectstatic --noinput
+
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+nginx.conf
+upstream django {
+    server django:8000;
+}
+
+upstream daphne {
+    server daphne:8001;
+}
+
+server {
+    listen 80;
+    server_name api.plait.kz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name api.plait.kz;
+
+    ssl_certificate     /etc/letsencrypt/live/api.plait.kz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.plait.kz/privkey.pem;
+
+    # REST API
+    location /api/ {
+        proxy_pass http://django;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # WebSocket
+    location /ws/ {
+        proxy_pass http://daphne;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
+    # Статика Django
+    location /static/ {
+        alias /app/staticfiles/;
+        expires 30d;
+    }
+}
+Переменные окружения (.env)
+# Django
+DJANGO_SETTINGS_MODULE=config.settings.production
+SECRET_KEY=ваш-секретный-ключ-минимум-50-символов
+DEBUG=False
+ALLOWED_HOSTS=api.plait.kz,localhost
+
+# База данных
+DATABASE_URL=postgresql://plait:password@db:5432/plait
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# JWT
+JWT_ACCESS_TOKEN_LIFETIME_MINUTES=60
+JWT_REFRESH_TOKEN_LIFETIME_DAYS=30
+
+# CORS
+CORS_ALLOWED_ORIGINS=https://cafe-879cf.web.app
+
+# Sentry (опционально)
+SENTRY_DSN=https://xxx@sentry.io/xxx
+Команды при деплое
+# Первый запуск
+docker compose up -d db redis
+docker compose run --rm django python manage.py migrate
+docker compose run --rm django python manage.py createsuperuser
+docker compose up -d
+
+# Обновление кода
+git pull
+docker compose build django daphne celery-worker celery-beat
+docker compose run --rm django python manage.py migrate
+docker compose up -d --no-deps django daphne celery-worker celery-beat
+15. Миграция с Firebase
+Этап 1 — Перенос данных (скрипт)
+# migration/migrate_from_firebase.py
+# Запускается один раз: python migrate_from_firebase.py
+
+import firebase_admin
+from firebase_admin import credentials, firestore
+import django
+import os
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+django.setup()
+
+cred = credentials.Certificate('firebase-service-account.json')
+firebase_admin.initialize_app(cred)
+fs = firestore.client()
+
+from apps.restaurants.models import Restaurant
+from apps.menu.models import Category, MenuItem
+
+def migrate_restaurants():
+    docs = fs.collection('restaurants').stream()
+    for doc in docs:
+        data = doc.to_dict()
+        rest, created = Restaurant.objects.update_or_create(
+            slug=data.get('slug', doc.id),
+            defaults={
+                'name':                   data.get('name', ''),
+                'address':                data.get('address', ''),
+                'service_charge_percent': data.get('serviceChargePercent', 10),
+                'is_public':              data.get('isPublic', True),
+            }
+        )
+        print(f"{'Created' if created else 'Updated'}: {rest.name}")
+        migrate_menu(doc.id, rest)
+
+def migrate_menu(firebase_rest_id: str, rest: Restaurant):
+    # Категории
+    cat_map = {}   # firebase_id → Category
+    cats = fs.collection(f'restaurants/{firebase_rest_id}/categories').stream()
+    for doc in cats:
+        d = doc.to_dict()
+        cat = Category.objects.create(
+            restaurant=rest,
+            name=d.get('name', ''),
+            sort_order=d.get('sortOrder', 0)
+        )
+        cat_map[doc.id] = cat
+
+    # Блюда
+    items = fs.collection(f'restaurants/{firebase_rest_id}/menuItems').stream()
+    for doc in items:
+        d = doc.to_dict()
+        MenuItem.objects.create(
+            restaurant=rest,
+            category=cat_map.get(d.get('categoryId')),
+            name=d.get('name', ''),
+            description=d.get('description', ''),
+            price=d.get('price', 0),
+            image_url=d.get('imageUrl', ''),
+            emoji=d.get('emoji', ''),
+            weight=d.get('weight', ''),
+            is_available=d.get('isAvailable', True),
+            is_visible=d.get('isVisible', True),
+            badge=d.get('badge') or '',
+            discount_percent=d.get('discountPercent', 0),
+            preparation_station=d.get('preparationStation', 'kitchen'),
+            sort_order=d.get('sortOrder', 0),
+        )
+
+if __name__ == '__main__':
+    migrate_restaurants()
+    print("Миграция завершена!")
+Этап 2 — Перенос пользователей
+Пароли Firebase нельзя перенести напрямую (алгоритм scrypt Firebase несовместим с Django).
+Стратегия: создать аккаунты без паролей, при первом входе попросить сменить пароль.
+# migration/migrate_users.py
+# Использует Firebase Admin SDK для получения списка пользователей
+
+from firebase_admin import auth as firebase_auth
+from apps.users.models import User
+from apps.restaurants.models import Restaurant
+
+def migrate_users():
+    # Получить всех пользователей из Firestore (профили)
+    user_docs = fs.collection('users').stream()
+
+    for doc in user_docs:
+        d = doc.to_dict()
+        try:
+            rest = Restaurant.objects.get(id=d.get('restaurantId'))
+        except Restaurant.DoesNotExist:
+            rest = None
+
+        user, created = User.objects.get_or_create(
+            email=d.get('email', ''),
+            defaults={
+                'name':       d.get('name', ''),
+                'role':       d.get('role', 'waiter'),
+                'restaurant': rest,
+                'is_active':  True,
+            }
+        )
+
+        if created:
+            # Установить временный пароль, попросить сменить
+            user.set_password('ChangeMe123!')
+            user.save()
+            print(f"Создан: {user.email} — пароль: ChangeMe123!")
+Этап 3 — Переключение фронтенда
+Менять постепенно, не всё сразу:
+Неделя 1: Добавить новый API клиент параллельно Firebase
+Неделя 2: Переключить авторизацию (Auth) → JWT
+Неделя 3: Переключить меню и рестораны
+Неделя 4: Переключить сессии и заказы (самое критичное)
+Неделя 5: Переключить WebSocket вместо Firestore onSnapshot
+Неделя 6: Отключить Firebase полностью
+Минимальные изменения в фронтенде:
+// Было (Firebase):
+import { db } from '../lib/firebase'
+import { collection, onSnapshot } from 'firebase/firestore'
+
+// Стало (Django REST + WebSocket):
+const API_BASE = 'https://api.plait.kz/api/v1'
+
+async function getMenu(restId: string) {
+  const res = await fetch(`${API_BASE}/restaurants/${restId}/menu/`)
+  return res.json()
+}
+16. Зависимости
+requirements.txt
+# Django core
+Django==5.0.4
+djangorestframework==3.15.1
+django-cors-headers==4.3.1
+
+# База данных
+psycopg2-binary==2.9.9
+
+# Аутентификация
+djangorestframework-simplejwt==5.3.1
+
+# Redis
+django-redis==5.4.0
+redis==5.0.4
+
+# WebSocket
+channels==4.1.0
+channels-redis==4.2.0
+daphne==4.1.2
+
+# Celery
+celery==5.4.0
+django-celery-beat==2.6.0    # периодические задачи из БД
+django-celery-results==2.5.1
+
+# Cloudinary
+cloudinary==1.40.0
+
+# Переменные окружения
+django-environ==0.11.2
+
+# API документация
+drf-spectacular==0.27.2      # автоматический Swagger
+
+# Мониторинг
+sentry-sdk[django]==2.3.1
+
+# WSGI сервер
+gunicorn==22.0.0
+requirements-dev.txt
+-r requirements.txt
+pytest-django==4.8.0
+pytest-asyncio==0.23.6
+factory-boy==3.3.0          # тестовые данные
+django-debug-toolbar==4.3.0
+ipython==8.24.0
+Swagger документация (автоматически)
+# config/urls.py
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerUIView
+
+urlpatterns = [
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/',   SpectacularSwaggerUIView.as_view(url_name='schema')),
+]
+После запуска: https://api.plait.kz/api/docs/ — интерактивная документация всех эндпоинтов.
+Итог
+По этому ТЗ строится полноценный production-ready backend:
