@@ -411,3 +411,53 @@ Admin больше не путает сетевую ошибку с отсутс
 
 ### Следующий лучший шаг
 P1: Guest Restaurant/Menu/Checkout loading/error/empty/retry audit, включая безопасное сохранение корзины и понятный recovery после ошибки оформления заказа.
+
+
+## 2026-09-17 — Cycle 15
+
+### Что изменено
+- Завершён P1 error/loading/empty-state audit на Guest Restaurant/Table/Menu/Cart/Checkout.
+- Guest menu получил явные `loading / error / empty / retry` состояния вместо бесконечного Spinner при пустом меню или сетевой ошибке.
+- При transient menu failure последний успешный snapshot остаётся на экране с предупреждением и временем обновления; ошибка больше не маскируется под «пустое меню».
+- Исправлен важный QR/table contract: `TableScreen` теперь передаёт `tableToken` в `useMenu`, поэтому стол обновляет меню через публичный `/guest/<token>/`, а не через generic restaurant path.
+- QR connect теперь маппит guest menu через единый `mapDjangoMenuItem`, устраняя расхождение формата между первым QR render и последующим refresh.
+- Добавлен restaurant/table-scoped cart draft в `localStorage` с TTL 24 часа. Draft восстанавливается только для того же ресторана и, для dine-in, того же QR table token; недоступные позиции удаляются только после успешной загрузки меню.
+- Сетевой сбой меню или оформления заказа больше не очищает корзину. Draft очищается только после подтверждённого успешного order API response.
+- Dine-in CartSheet и Delivery/Pickup Checkout получили видимую ошибку отправки, защиту от double-submit и понятный retry; введённые данные/корзина остаются на месте.
+- Добавлены отдельные empty states для реально пустого меню и пустой выбранной категории.
+- AI_ENABLED=false; внешние AI API не добавлялись.
+
+### Как протестировано
+- `python -m compileall backend/apps/users backend/apps/sessions backend/apps/websocket backend/apps/analytics backend/apps/tables backend/apps/menu`: PASS.
+- `bash -n scripts/verify.sh`: PASS.
+- Global `tsc --noEmit` запущен: runtime dependency resolution по-прежнему BLOCKED отсутствующим `frontend/node_modules` (React/Zustand/Lucide types); отдельная фильтрация изменённых файлов не выявила новых синтаксических ошибок сверх dependency/cascade type errors.
+- Статически проверены QR → mapped guest menu → table public refresh, scoped cart restore/prune, failed order preservation и successful-order draft clear.
+
+### Результат
+Гость теперь не теряет корзину из-за refresh/краткого обрыва сети и понимает разницу между загрузкой, реальным пустым меню и ошибкой сервера. Повторная отправка заказа безопаснее, а QR-table menu refresh использует правильный публичный guest contract.
+
+### Следующий лучший шаг
+P1: PWA service worker/update strategy — offline shell, safe update prompt, cache boundaries для guest assets и запрет кэширования transactional/order API responses.
+
+## 2026-09-17 — Cycle 16
+
+### Что изменено
+- Закрыт P1 PWA service worker/update strategy для guest application shell.
+- Добавлен собственный `public/sw.js` без внешних PWA/AI-зависимостей: offline fallback для navigation и cache-first + background refresh только для same-origin static assets.
+- Transactional/non-GET requests и API семейств sessions/orders/payments/analytics/waiter/calls/auth принципиально не перехватываются service worker, поэтому устаревший cache не может подменить заказ, оплату, вызов или аналитику.
+- Добавлена регистрация SW только production-сборке и безопасный update flow: новая версия ждёт явного действия пользователя, затем `SKIP_WAITING` + один controlled reload.
+- Guest App показывает компактный mobile-friendly prompt «Доступно обновление Plait» с действиями «Обновить / Позже»; существующий 24h cart draft переживает reload.
+- AI_ENABLED=false; внешние AI API не добавлялись.
+
+### Как протестировано
+- `python -m compileall backend/apps/users backend/apps/sessions backend/apps/websocket backend/apps/analytics backend/apps/tables backend/apps/menu`: PASS.
+- `bash -n scripts/verify.sh`: PASS.
+- `node --check frontend/public/sw.js`: PASS.
+- Статически проверены cache boundaries: non-GET и transactional API bypass; navigation offline fallback; static same-origin caching only.
+- Frontend typecheck/build остаются runtime-blocked отсутствующим `frontend/node_modules`; CI contract выполняет их на dependency-capable runner.
+
+### Результат
+Plait теперь имеет контролируемую PWA update strategy: гость может открыть уже загруженный shell при кратком offline, статические ресурсы повторно используются, но критические ресторанные операции никогда не берутся из stale cache. Обновление приложения не происходит неожиданно посреди оформления заказа.
+
+### Следующий лучший шаг
+P1: Onboarding wizard для первых ресторанов — restaurant profile → menu → tables/QR → staff → go-live checklist.

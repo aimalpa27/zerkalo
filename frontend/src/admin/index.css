@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── ТЁМНАЯ ТЕМА (по умолчанию) ── Plait brand palette */
+:root {
+  /* Кофе 70% */
+  --color-bg:    #1A0F08;
+  --color-card:  #251408;
+  --color-card2: #311A0C;
+  /* Шафран 20% — текст */
+  --color-soft:  #FAC775;
+  --color-mid:   rgba(250,199,117,0.65);
+  --color-dim:   rgba(250,199,117,0.40);
+  /* Огонь 8% — основной акцент */
+  --color-gold:  #FF6B1A;
+  /* Мандарин 2% — hover */
+  --color-gold2: #FF9248;
+  /* Границы и стекло */
+  --color-rim:   rgba(255,107,26,0.15);
+  --glass-bg:    rgba(26,15,8,0.92);
+  --glow-color:  rgba(255,107,26,0.15);
+  --glow-border: rgba(255,107,26,0.22);
+  /* Системные */
+  --color-green: #4CAF50;
+  --color-red:   #EF4444;
+  --color-orange:#FF9248;
+
+  /* ── Card system ── */
+  --card-border: rgba(255,107,26,0.20);
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,107,26,0.07);
+  --card-pay-border: rgba(255,107,26,0.50);
+  --card-pay-shadow: 0 0 24px rgba(255,107,26,0.18), 0 4px 16px rgba(0,0,0,0.45);
+}
+
+/* ── СВЕТЛАЯ ТЕМА ── */
+body.theme-light {
+  --color-bg:    #FFFAF5;
+  --color-card:  #FFF5EA;
+  --color-card2: #FDECD6;
+  --color-soft:  #1A0F08;
+  --color-mid:   #5C3820;
+  --color-dim:   #9E6B42;
+  --color-rim:   rgba(255,107,26,0.18);
+  --color-gold:  #FF6B1A;
+  --color-gold2: #FF9248;
+  --glass-bg:    rgba(255,250,245,0.94);
+  --glow-color:  rgba(255,107,26,0.10);
+  --glow-border: rgba(255,107,26,0.20);
+  --color-green: #1B6B1B;
+  --color-red:   #B91C1C;
+  --color-orange:#E05A10;
+
+  --card-border: rgba(255,107,26,0.18);
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --card-pay-border: rgba(255,107,26,0.40);
+  --card-pay-shadow: 0 4px 16px rgba(255,107,26,0.10), 0 2px 6px rgba(0,0,0,0.06);
+}
+
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-soft);
+  overflow-x: hidden;
+  transition: background 0.25s ease, color 0.25s ease;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+/* ── Toggle Switch ── */
+.adm-toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+.adm-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.adm-toggle-track {
+  position: absolute; inset: 0;
+  background: var(--color-rim);
+  border-radius: 13px; cursor: pointer; transition: background .3s;
+}
+.adm-toggle-track::before {
+  content: ''; position: absolute;
+  width: 20px; height: 20px; background: #fff; border-radius: 50%;
+  top: 3px; left: 3px; transition: transform .3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.adm-toggle input:checked + .adm-toggle-track { background: var(--color-green); }
+.adm-toggle input:checked + .adm-toggle-track::before { transform: translateX(18px); }
+
+/* ── Admin Layout ── */
+.adm-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.adm-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: none;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-rim);
+  background: var(--color-card);
+}
+.adm-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.adm-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+@media (min-width: 768px) {
+  .adm-sidebar { display: flex; }
+  .adm-bottom-nav { display: none !important; }
+  .adm-content { padding-bottom: 24px; }
+}
+
+/* ── Bar chart ── */
+.adm-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-gold), var(--color-gold2));
+  border-radius: 6px; transition: width .5s ease;
+  display: flex; align-items: center;
+  padding-right: 6px; justify-content: flex-end;
+}
+
+/* ── Card utility ── */
+.adm-card {
+  background: var(--color-card);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: 1rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.adm-card-pay {
+  background: var(--color-card);
+  border: 1px solid var(--card-pay-border);
+  box-shadow: var(--card-pay-shadow);
+  border-radius: 1rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+/* ── QR печать (вкладка «Столы») ──
+   Печатный блок рендерится в DOM только на время печати (см. TableQRModal /
+   TablesTab), а этот CSS прячет всё остальное приложение и показывает только
+   его — чёрный QR на белом листе, без хедеров/сайдбаров/темы. */
+.adm-qr-print { display: none; }
+
+@media print {
+  @page { margin: 10mm; }
+
+  html, body { background: #fff !important; }
+
+  body * { visibility: hidden !important; }
+  .adm-qr-print, .adm-qr-print * { visibility: visible !important; }
+
+  .adm-qr-print {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.adm-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.adm-qr-card .adm-qr-restaurant {
+  font-weight: 800;
+  font-size: 15px;
+  color: #000;
+  margin: 0 0 14px;
+}
+
+.adm-qr-card .adm-qr-tablenum {
+  font-weight: 800;
+  font-size: 26px;
+  color: #000;
+  margin: 14px 0 0;
+}
+
+.adm-qr-bulk-grid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.adm-qr-bulk-grid .adm-qr-card {
+  flex: 0 0 50%;
+  border: 1px dashed #ccc;
+}
+
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .gold-text {
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
