@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── ТЁМНАЯ ТЕМА (по умолчанию) ── Plait brand palette */
+:root {
+  /* Кофе 70% */
+  --color-bg:    #1A0F08;
+  --color-card:  #251408;
+  --color-card2: #311A0C;
+  /* Шафран 20% — текст */
+  --color-soft:  #FAC775;
+  --color-mid:   rgba(250,199,117,0.65);
+  --color-dim:   rgba(250,199,117,0.40);
+  /* Огонь 8% — основной акцент */
+  --color-gold:  #FF6B1A;
+  /* Мандарин 2% — hover */
+  --color-gold2: #FF9248;
+  /* Границы и стекло */
+  --color-rim:   rgba(255,107,26,0.15);
+  --glass-bg:    rgba(26,15,8,0.92);
+  --glow-color:  rgba(255,107,26,0.15);
+  --glow-border: rgba(255,107,26,0.22);
+  /* Системные */
+  --color-green: #4CAF50;
+  --color-red:   #EF4444;
+  --color-orange:#FF9248;
+
+  /* ── Card system ── */
+  --card-border: rgba(255,107,26,0.20);
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,107,26,0.07);
+  --card-pay-border: rgba(255,107,26,0.50);
+  --card-pay-shadow: 0 0 24px rgba(255,107,26,0.18), 0 4px 16px rgba(0,0,0,0.45);
+}
+
+/* ── СВЕТЛАЯ ТЕМА ── */
+body.theme-light {
+  --color-bg:    #FFFAF5;
+  --color-card:  #FFF5EA;
+  --color-card2: #FDECD6;
+  --color-soft:  #1A0F08;
+  --color-mid:   #5C3820;
+  --color-dim:   #9E6B42;
+  --color-rim:   rgba(255,107,26,0.18);
+  --color-gold:  #FF6B1A;
+  --color-gold2: #FF9248;
+  --glass-bg:    rgba(255,250,245,0.94);
+  --glow-color:  rgba(255,107,26,0.10);
+  --glow-border: rgba(255,107,26,0.20);
+  --color-green: #1B6B1B;
+  --color-red:   #B91C1C;
+  --color-orange:#E05A10;
+
+  --card-border: rgba(255,107,26,0.18);
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --card-pay-border: rgba(255,107,26,0.40);
+  --card-pay-shadow: 0 4px 16px rgba(255,107,26,0.10), 0 2px 6px rgba(0,0,0,0.06);
+}
+
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-soft);
+  overflow-x: hidden;
+  transition: background 0.25s ease, color 0.25s ease;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+/* ── Toggle Switch ── */
+.adm-toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+.adm-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.adm-toggle-track {
+  position: absolute; inset: 0;
+  background: var(--color-rim);
+  border-radius: 13px; cursor: pointer; transition: background .3s;
+}
+.adm-toggle-track::before {
+  content: ''; position: absolute;
+  width: 20px; height: 20px; background: #fff; border-radius: 50%;
+  top: 3px; left: 3px; transition: transform .3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.adm-toggle input:checked + .adm-toggle-track { background: var(--color-green); }
+.adm-toggle input:checked + .adm-toggle-track::before { transform: translateX(18px); }
+
+/* ── Admin Layout ── */
+.adm-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.adm-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: none;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-rim);
+  background: var(--color-card);
+}
+.adm-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.adm-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+@media (min-width: 768px) {
+  .adm-sidebar { display: flex; }
+  .adm-bottom-nav { display: none !important; }
+  .adm-content { padding-bottom: 24px; }
+}
+
+/* ── Bar chart ── */
+.adm-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-gold), var(--color-gold2));
+  border-radius: 6px; transition: width .5s ease;
+  display: flex; align-items: center;
+  padding-right: 6px; justify-content: flex-end;
+}
+
+/* ── Card utility ── */
+.adm-card {
+  background: var(--color-card);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: 1rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.adm-card-pay {
+  background: var(--color-card);
+  border: 1px solid var(--card-pay-border);
+  box-shadow: var(--card-pay-shadow);
+  border-radius: 1rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+/* ── QR печать (вкладка «Столы») ──
+   Печатный блок рендерится в DOM только на время печати (см. TableQRModal /
+   TablesTab), а этот CSS прячет всё остальное приложение и показывает только
+   его — чёрный QR на белом листе, без хедеров/сайдбаров/темы. */
+.adm-qr-print { display: none; }
+
+@media print {
+  @page { margin: 10mm; }
+
+  html, body { background: #fff !important; }
+
+  body * { visibility: hidden !important; }
+  .adm-qr-print, .adm-qr-print * { visibility: visible !important; }
+
+  .adm-qr-print {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.adm-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.adm-qr-card .adm-qr-restaurant {
+  font-weight: 800;
+  font-size: 15px;
+  color: #000;
+  margin: 0 0 14px;
+}
+
+.adm-qr-card .adm-qr-tablenum {
+  font-weight: 800;
+  font-size: 26px;
+  color: #000;
+  margin: 14px 0 0;
+}
+
+.adm-qr-bulk-grid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.adm-qr-bulk-grid .adm-qr-card {
+  flex: 0 0 50%;
+  border: 1px dashed #ccc;
+}
+
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .gold-text {
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Cycle 17 — first-restaurant onboarding wizard */
+.onboarding-backdrop{position:fixed;inset:0;z-index:1200;background:rgba(5,8,14,.68);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:20px}.onboarding-card{width:min(620px,100%);max-height:calc(100dvh - 40px);overflow:auto;position:relative;background:var(--color-surface,#151922);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:26px;box-shadow:0 24px 80px rgba(0,0,0,.45)}.onboarding-close{position:absolute;right:16px;top:16px;border:0;background:rgba(255,255,255,.07);color:inherit;width:36px;height:36px;border-radius:12px;display:grid;place-items:center;cursor:pointer}.onboarding-hero{display:flex;gap:14px;padding-right:34px}.onboarding-icon{width:46px;height:46px;border-radius:15px;background:var(--color-accent,#ff6b1a);display:grid;place-items:center;color:#fff;flex:0 0 auto}.onboarding-kicker{font-size:12px;text-transform:uppercase;letter-spacing:.1em;opacity:.65;font-weight:800}.onboarding-hero h2{font-size:22px;line-height:1.2;margin:5px 0 7px}.onboarding-hero p{margin:0;opacity:.7;line-height:1.45;font-size:14px}.onboarding-progress-row{display:flex;justify-content:space-between;margin-top:22px;font-size:13px}.onboarding-progress-row span{opacity:.65}.onboarding-progress{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin:8px 0 18px}.onboarding-progress span{display:block;height:100%;background:var(--color-accent,#ff6b1a);border-radius:inherit;transition:width .2s ease}.onboarding-steps{display:grid;gap:9px}.onboarding-step{width:100%;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.035);color:inherit;border-radius:16px;padding:13px;display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer}.onboarding-step:hover{background:rgba(255,255,255,.065)}.onboarding-step.done{border-color:rgba(67,205,126,.28)}.onboarding-step-status{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-weight:800;flex:0 0 auto}.onboarding-step.done .onboarding-step-status{background:rgba(67,205,126,.15);color:#58d68d}.onboarding-step-copy{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}.onboarding-step-copy small{opacity:.6;line-height:1.3}.onboarding-error{margin-top:12px;border-radius:12px;padding:11px 13px;background:rgba(235,87,87,.13);color:#ff9b9b;font-size:13px}.onboarding-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}.onboarding-preview,.onboarding-publish{min-height:42px;border-radius:12px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:750;text-decoration:none}.onboarding-preview{border:1px solid rgba(255,255,255,.12);color:inherit}.onboarding-publish{border:0;background:var(--color-accent,#ff6b1a);color:#fff;cursor:pointer}.onboarding-publish:disabled{opacity:.42;cursor:not-allowed}@media(max-width:640px){.onboarding-backdrop{align-items:flex-end;padding:0}.onboarding-card{width:100%;max-height:92dvh;border-radius:24px 24px 0 0;padding:22px 16px calc(18px + env(safe-area-inset-bottom))}.onboarding-hero h2{font-size:19px}.onboarding-actions{position:sticky;bottom:0;background:var(--color-surface,#151922);padding-top:12px}.onboarding-preview,.onboarding-publish{flex:1}}
+.onboarding-profile-form{display:grid;gap:9px;padding:14px;margin-bottom:12px;border-radius:16px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)}.onboarding-profile-form input{width:100%;min-height:42px;border-radius:11px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.12);color:inherit;padding:0 12px;outline:none}.onboarding-profile-form input:focus{border-color:var(--color-accent,#ff6b1a)}.onboarding-profile-actions{display:flex;gap:8px;justify-content:flex-end}.onboarding-profile-actions button{border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 13px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.onboarding-profile-actions button:last-child{border:0;background:var(--color-accent,#ff6b1a);color:#fff;font-weight:750}.onboarding-profile-actions button:disabled{opacity:.5}

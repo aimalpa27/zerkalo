@@ -1,0 +1,23 @@
+asgiref==3.11.1
+Django==5.0.4
+django-cors-headers==4.3.1
+django-environ==0.11.2
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+daphne==4.1.2
+channels==4.1.0
+channels-redis==4.2.0
+gunicorn==22.0.0
+psycopg2-binary==2.9.9
+PyJWT==2.13.0
+requests==2.32.3
+sqlparse==0.5.5
+drf-spectacular==0.28.0
+cloudinary==1.40.0
+celery==5.4.0
+django-celery-beat==2.6.0
+django-celery-results==2.5.1
+redis==5.0.4
+# Security
+argon2-cffi==23.1.0
+sentry-sdk[django]==2.5.1

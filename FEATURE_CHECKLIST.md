@@ -5,23 +5,57 @@
 | Функция | Статус | Guest | Admin | Kitchen | Backend/DB | Permissions | Mobile | Errors | Tests | Analytics | Production Ready |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Restaurants | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | partial | NO |
-| Menu | PARTIAL | ✓ | ✓ | reads items | ✓ | ✓ tenant relation hardened | ✓ | partial | tenant regression added | partial | NO |
+| Menu | PARTIAL | ✓ resilient loading/error/empty/retry + stale snapshot | ✓ CRUD + CSV/XLSX preview/import | reads items | ✓ atomic import | ✓ tenant/role relation hardened | ✓ import bottom-sheet | ✓ preview/row errors/duplicate states | tenant + import regression added; runtime pending | partial | NO |
 | Categories | PARTIAL | ✓ | ✓ | N/A | ✓ | ✓ | ✓ | partial | partial | N/A | NO |
-| Tables | PARTIAL | ✓ | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | backend partial | partial | NO |
-| QR Tables | PARTIAL | ✓ FIXED direct flow | ✓ | sees table no. | ✓ | ✓ | ✓ | ✓ | needs frontend E2E | partial | NO |
-| Cart | PARTIAL | ✓ | N/A | N/A | N/A | N/A | ✓ | partial | missing frontend tests | N/A | NO |
-| Orders | PARTIAL | ✓ realtime status | ✓ realtime + resilient sessions loading/error/retry | ✓ realtime refresh + JWT reconnect hardened | ✓ session race + status broadcast hardened | ✓ tenant + assigned-waiter table scope | ✓ | payment-boundary error ✓ | full cross-endpoint QR→close→analytics regression added + CI gate | final total/top revenue hardened | NO |
-| Kitchen | PARTIAL | N/A | sees statuses | ✓ dedicated kitchen auth + realtime reload | ✓ dedicated role | ✓ least privilege: read sessions + confirmed↔ready only | tablet/mobile resilient | ✓ loading/error/empty + retry + stale-data preservation + action errors | regression added + CI gate; sandbox runtime blocked | prep data partial | NO |
-| Waiter Calls | PARTIAL | ✓ | ✓ resilient loading/error/retry | N/A | ✓ | ✓ assigned-waiter REST/realtime scope | ✓ | ✓ stale-data warning | backend present | limited | NO |
+| Tables | PARTIAL | ✓ | ✓ + atomic bulk 1–N Admin/Manager | sees table no. | ✓ bulk transaction | ✓ tenant/role/tariff/zone | ✓ | ✓ duplicate/range/limit states | bulk regression added; runtime pending | partial | NO |
+| QR Tables | PARTIAL | ✓ FIXED direct flow | ✓ single QR + bulk A4 PDF Admin/Manager | sees table no. | ✓ | ✓ role/tenant | ✓ PDF action mobile-safe | ✓ PDF loading/error + empty guard | PDF helper static typecheck; frontend E2E pending | partial | NO |
+| Cart | PARTIAL | ✓ 24h restaurant/table-scoped draft persistence | N/A | N/A | N/A | context-isolated draft | ✓ | ✓ preserved on menu/order failure | missing frontend runtime tests | N/A | NO |
+| Orders | PARTIAL | ✓ realtime status + checkout retry without cart loss | ✓ realtime + resilient sessions loading/error/retry | ✓ realtime refresh + JWT reconnect hardened | ✓ session race + status broadcast hardened | ✓ tenant + assigned-waiter table scope | ✓ | payment-boundary error ✓ | full cross-endpoint QR→close→analytics regression added + CI gate | final total/top revenue hardened | NO |
+| Kitchen | PARTIAL | N/A | sees statuses + SLA analytics | ✓ dedicated kitchen auth + realtime reload | ✓ dedicated role + lifecycle timestamps | ✓ least privilege: read sessions + confirmed↔ready only | tablet/mobile resilient | ✓ loading/error/empty + retry + stale-data preservation + action errors | regression + Kitchen SLA tests added; runtime pending | ✓ configurable tenant SLA + kitchen/hand-off compliance + live SLA alerts + durable incident history/trends + breach period comparison/station bottlenecks + waiter response/serve avg+p95 + attributed workload + shift/zone operational load | NO |
+| Waiter Calls | PARTIAL | ✓ | ✓ resilient loading/error/retry + unified exceptions inbox | N/A | ✓ | ✓ assigned-waiter REST/realtime scope | ✓ | ✓ stale-data warning | backend present | limited | NO |
 | Staff | PARTIAL | N/A | ✓ | dedicated kitchen auth | ✓ | ✓ kitchen excluded from generic staff APIs | ✓ | partial | kitchen creation/isolation regression added | limited | NO |
-| Analytics | PARTIAL | N/A | ✓ authoritative API + retry/stale snapshot | N/A | ✓ summary + closed history | ✓ | ✓ | ✓ no fake-zero fallback | quantity/non-billable + full-flow regression added | ✓ top-item revenue fixed + closed history | NO |
-| Upsell | NOT IMPLEMENTED | — | — | N/A | — | — | — | — | — | — | NO |
+| Analytics | PARTIAL | N/A | ✓ Owner v2: period comparison + operational KPI + retry/stale snapshot | N/A | ✓ authoritative summary + closed history | ✓ Admin/Manager tenant-safe | ✓ responsive KPI cards | ✓ no fake-zero fallback | comparison/KPI/tenant tests + full-flow gate | ✓ revenue/avg check/load/peak/upsell/top items + deterministic daily manager digest (shift coverage/SLA/problem zone) + action drill-down to session/tables/schedule + unified operations exceptions inbox + ownership/response/resolution KPI + per-session operations audit timeline | NO — runtime suite pending |
+| Network Menu | READY | Guest consumes normal published menu | Owner canonical CRUD/publish | N/A | ✓ template + branch overrides + idempotent materialization | ✓ Owner canonical; branch Admin/Manager own overrides | ✓ owner panel | ✓ loading/error/empty/publish feedback | network menu regression added; runtime pending | N/A | NO — runtime suite pending |
+| Network / Multi-location | READY | N/A | Owner(Admin) consolidated dashboard | denied | ✓ network model + aggregate | ✓ owner-only + support-controlled membership | ✓ | ✓ loading/error/empty/retry | tenant isolation tests added; runtime pending | ✓ branch ranking/revenue/avg check/upsell | NO — runtime suite pending |
+| Upsell | IMPLEMENTED | Admin/Manager CRUD | Guest cart + funnel events | RULE-BASED | tenant-safe | active/sellable only | mobile | loading/empty/error | event/tenant tests added | impression→add→conversion + attributed revenue | YES* |
+| Loyalty / CRM | READY | ✓ anonymous token + reward progress/redemption, no signup/PII | ✓ Admin/Manager dashboard + program settings | denied | ✓ member + earn/redemption ledgers + session discount | ✓ tenant scoped; Waiter/Kitchen denied | ✓ | ✓ loading/error/empty/retry | earn/settings/redemption regression added; runtime pending | ✓ visits/spend/repeat rate/redemptions/discount | NO — runtime suite pending |
 | Payments | PARTIAL | request/method | ✓ guarded close | N/A | ✓ transition guards | ✓ waiter/role scope | ✓ | explicit close errors ✓ | backend regression added | closed-total consistency ✓ | NO |
 | Promos | PARTIAL | ✓ | limited | N/A | ✓ | review | ✓ | partial | limited | limited | NO |
 | Settings | PARTIAL | consumes | ✓ | N/A | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
-| Onboarding | NOT IMPLEMENTED | N/A | — | N/A | existing primitives | — | — | — | — | — | NO |
+| Onboarding | READY | preview | ✓ Admin/Manager wizard | denied | ✓ guarded publish | ✓ role + readiness | ✓ bottom-sheet | ✓ loading/error/retry | backend regression added; runtime blocked by missing Django | N/A | NO — runtime suite pending |
 | Delivery/Takeaway | PARTIAL | ✓ | ✓ | partial | ✓ | ✓ | ✓ | partial | backend present | partial | NO |
 | Chat | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
 | Schedule | PARTIAL | N/A | ✓ | staff | ✓ | ✓ | ✓ | partial | limited | N/A | NO |
-| PWA | PARTIAL | manifest | N/A | manifest | N/A | N/A | ✓ | N/A | missing | N/A | NO |
-| Demo Mode | NOT IMPLEMENTED | — | — | — | — | — | — | — | — | — | NO |
+| PWA | PARTIAL | ✓ manifest + offline shell + safe update prompt | N/A | manifest | SW static cache only | transactional API bypass | ✓ | ✓ offline/update recovery | static boundary checks; runtime build via CI | N/A | NO |
+| Demo Mode | READY | Guest lifecycle | Admin confirmation | — | Waiter handoff | Kitchen board | Owner analytics | isolated mock data | mobile/desktop | no production writes | YES |
+
+
+## Operations
+
+| Support Diagnostics | READY | Admin/Manager tenant-safe snapshot: dependencies, counts, subscription, iiko config state, warnings; no secrets/PII/raw logs | NO — Django runtime suite pending |
+
+| Area | Status | Coverage | Production Ready |
+|---|---|---|---|
+| Operations / Health | PARTIAL | `/health/live` + `/health/ready` DB/cache/realtime, non-sensitive 503, tests + SLO runbook | NO — runtime dependency suite pending |
+
+### Cycle 42 — Table Service Quality Summary
+- READY (code-complete, runtime pending): per-session deterministic service quality summary from authoritative lifecycle timestamps.
+- Admin/Manager/Waiter: order→confirm, confirm→ready, ready→served, service duration, SLA/calls/exceptions, completed/rejected counts.
+- Kitchen: preparation-only summary; no FOH calls/handoff/exceptions exposure.
+- Mobile: responsive 2/3-column KPI grid inside Session Detail; shares timeline loading/error/retry state.
+- AI_ENABLED=false; no external AI APIs.
+
+### Cycle 44 — Service Recovery Analytics UI
+- READY (code/static): Analytics shows recovery count/cost, cause breakdown and exact previous-period deltas from the durable recovery ledger.
+- READY (code/static): recent recovery cases include tenant-safe session/table drill-down into the existing Session Detail flow.
+- READY (code/static): empty state and responsive 2→4 KPI layout; no AI or inferred causes.
+- TESTS ADDED: recovery aggregation/drill-down payload + cross-tenant exclusion; runtime pending dependency-capable runner.
+
+### Cycle 43 — Service Recovery Notes
+- READY (code/static): Admin/Manager tenant-safe recovery CRUD for a session: factual reason/note/compensation/author/server timestamp.
+- READY (code/static): recovery appears in session audit timeline; Kitchen/Waiter/Guest do not receive manager recovery CRUD.
+- READY (code/static): analytics aggregates recovery count, compensation cost and reason breakdown for selected period.
+- READY (UI): mobile Session Detail form/list with empty/saving/error feedback.
+- TESTS ADDED: create/list/delete, validation, Waiter/Kitchen denial, cross-tenant isolation. Runtime pending dependency-capable runner.
+- Production Ready: NO — P0 full lifecycle runtime regression still blocked by missing dependencies.
+- [x] P4 Service recovery action tracking — explicit source linkage, tenant/session guards, coverage KPI, mobile source selector (Cycle 45).
