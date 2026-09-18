@@ -1,4 +1,4 @@
-name: Plait Cycle 47 P0 Validation
+name: Plait Cycle 48 P0 Validation
 on:
   push:
     paths:
@@ -16,9 +16,9 @@ jobs:
     env:
       AI_ENABLED: 'false'
       DJANGO_SETTINGS_MODULE: config.settings.development
-      SECRET_KEY: ci-cycle47-secret
+      SECRET_KEY: ci-cycle48-secret
       DEBUG: 'True'
-      DATABASE_URL: sqlite:///ci-cycle47.sqlite3
+      DATABASE_URL: sqlite:///ci-cycle48.sqlite3
       REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +39,29 @@ jobs:
         working-directory: backend
         run: python -c "import redis; r=redis.Redis.from_url('redis://127.0.0.1:6379/0'); assert r.ping()"
       - name: Django checks and migrations
+        id: django_gate
+        continue-on-error: true
         working-directory: backend
         run: |
-          python manage.py check
-          python manage.py migrate --noinput
+          set -o pipefail
+          : > ../cycle48-diagnostics.txt
+          echo '=== manage.py check ===' | tee -a ../cycle48-diagnostics.txt
+          python manage.py check 2>&1 | tee -a ../cycle48-diagnostics.txt
+          CHECK=${PIPESTATUS[0]}
+          echo '=== migrate ===' | tee -a ../cycle48-diagnostics.txt
+          python manage.py migrate --noinput 2>&1 | tee -a ../cycle48-diagnostics.txt
+          MIGRATE=${PIPESTATUS[0]}
+          echo "check_exit=$CHECK migrate_exit=$MIGRATE" | tee -a ../cycle48-diagnostics.txt
+          test "$CHECK" -eq 0 -a "$MIGRATE" -eq 0
+      - name: Upload Django diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cycle48-diagnostics
+          path: cycle48-diagnostics.txt
+      - name: Stop if Django gate failed
+        if: steps.django_gate.outcome != 'success'
+        run: exit 1
       - name: P0 QR to analytics + roles + realtime regression
         working-directory: backend
         run: |
