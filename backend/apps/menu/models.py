@@ -108,7 +108,7 @@ class UpsellRule(models.Model):
         ordering = ['priority', 'created_at']
         constraints = [
             models.UniqueConstraint(fields=['restaurant', 'trigger_item', 'recommended_item'], name='uniq_restaurant_upsell_pair'),
-            models.CheckConstraint(condition=~models.Q(trigger_item=models.F('recommended_item')), name='upsell_items_must_differ'),
+            models.CheckConstraint(check=~models.Q(trigger_item=models.F('recommended_item')), name='upsell_items_must_differ'),
         ]
         indexes = [models.Index(fields=['restaurant', 'is_active', 'priority'])]
 
