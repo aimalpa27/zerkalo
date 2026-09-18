@@ -1,0 +1,31 @@
+name: Unpack Plait Cycle 45
+on:
+  push:
+    paths:
+      - '.github/workflows/unpack-cycle45.yml'
+permissions:
+  contents: write
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Unpack Cycle 45 into repository root
+        run: |
+          set -e
+          rm -rf /tmp/plait45
+          mkdir -p /tmp/plait45
+          unzip -q Plait-cycle-45.zip -d /tmp/plait45
+          test -f /tmp/plait45/plait41/CHANGELOG_PLAIT.md
+          cp -a /tmp/plait45/plait41/. .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Deploy Plait Cycle 45 source"
+            git push
+          fi
