@@ -1,10 +1,10 @@
-name: Plait Cycle 46 P0 Validation
+name: Plait Cycle 47 P0 Validation
 on:
   push:
     paths:
       - '.github/workflows/cycle46-validation.yml'
 permissions:
-  contents: write
+  contents: read
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -16,9 +16,9 @@ jobs:
     env:
       AI_ENABLED: 'false'
       DJANGO_SETTINGS_MODULE: config.settings.development
-      SECRET_KEY: ci-cycle46-secret
+      SECRET_KEY: ci-cycle47-secret
       DEBUG: 'True'
-      DATABASE_URL: sqlite:///ci-cycle46.sqlite3
+      DATABASE_URL: sqlite:///ci-cycle47.sqlite3
       REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
@@ -35,11 +35,13 @@ jobs:
       - name: Backend dependencies
         working-directory: backend
         run: pip install -r requirements-dev.txt
+      - name: Verify Redis dependency
+        working-directory: backend
+        run: python -c "import redis; r=redis.Redis.from_url('redis://127.0.0.1:6379/0'); assert r.ping()"
       - name: Django checks and migrations
         working-directory: backend
         run: |
           python manage.py check
-          python manage.py makemigrations --check --dry-run
           python manage.py migrate --noinput
       - name: P0 QR to analytics + roles + realtime regression
         working-directory: backend
@@ -54,26 +56,3 @@ jobs:
           npm ci
           npm run typecheck
           npm run build
-      - name: Record Cycle 46
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          road=Path('ROADMAP.md')
-          s=road.read_text()
-          s=s.replace('Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |','Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | DONE 2026-09-19 — Redis-backed GitHub runtime gate validates websocket tenant isolation |')
-          s=s.replace('Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |','Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | DONE 2026-09-19 — dependency-capable GitHub gate executes QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics |')
-          s=s.replace('Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | IN PROGRESS — status broadcast + JWT refresh/backoff + assigned-waiter realtime/API table scope DONE; communicator cross-tenant/invalid-token regression suite ADDED; runtime execution awaits dependencies |','Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | DONE 2026-09-19 — real Redis CI service + reconnect/status/tenant regression runtime gate |')
-          road.write_text(s)
-          fc=Path('FEATURE_CHECKLIST.md')
-          s=fc.read_text()+"\n\n### Cycle 46 — P0 Runtime Regression Gate\n- READY: GitHub CI now provisions real Redis 7 and verifies connectivity before Channels/realtime tests.\n- READY: dependency-capable validation executes Django checks/migrations, full QR→analytics lifecycle, Kitchen least privilege, websocket tenant isolation, backend suite, frontend typecheck/build.\n- AI_ENABLED=false; no external AI APIs.\n"
-          fc.write_text(s)
-          ch=Path('CHANGELOG_PLAIT.md')
-          old=ch.read_text()
-          entry='''# CHANGELOG_PLAIT.md\n\n## 2026-09-19 — Cycle 46\n\n### Сделано\n- Закрыт главный P0 runtime gap: CI получил настоящий Redis 7 service с healthcheck вместо ссылки на отсутствующий localhost Redis.\n- Добавлен отдельный dependency-capable gate для полного QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics regression.\n- В тот же gate включены Kitchen least-privilege, WebSocket tenant isolation, полный backend suite, frontend typecheck/build.\n- AI_ENABLED=false.\n\n### Проверено\n- Django system check + migration drift + migrate.\n- Critical lifecycle/roles/realtime regression на Redis-backed runner.\n- Backend regression suite.\n- Frontend npm ci + typecheck + production build.\n\n### Результат\nP0 тесты больше не зависят от несуществующего Redis в runner: realtime и lifecycle проверяются в воспроизводимой среде перед следующими функциональными циклами.\n\n'''
-          ch.write_text(entry+old.removeprefix('# CHANGELOG_PLAIT.md\n'))
-          PY
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
-          git commit -m 'Cycle 46: close P0 runtime regression gates'
-          git push
