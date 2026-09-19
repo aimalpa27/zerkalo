@@ -6,6 +6,7 @@
 |---|---|---:|---:|---:|---|---|
 | Direct QR auto-connect | P0 | Critical | S | 1–2h | guest endpoint | DONE 2026-09-16 |
 | Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 — GitHub Actions + local verify script; current sandbox install blocked by DNS |
+| Backend public runtime / ASGI deployment | P0 | Critical | M | 0.5d | Render + Postgres + Redis | CODE READY 2026-09-19 — root Render Blueprint, production settings, migrations, ASGI/Daphne, liveness probe; external account/env provisioning pending |
 | Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |
 | Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |
 | Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | DONE 2026-09-17 — dedicated role, action scope, frontend auth, tests |
