@@ -1,4 +1,5 @@
 from django.db import migrations, models
+import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -9,7 +10,18 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='tablesession',
+            name='loyalty_member',
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name='sessions',
+                to='loyalty.loyaltymember',
+            ),
+        ),
+        migrations.AddField(
+            model_name='tablesession',
             name='loyalty_discount_amount',
             field=models.DecimalField(decimal_places=2, default=0, max_digits=10),
-        )
+        ),
     ]
