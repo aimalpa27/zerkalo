@@ -37,6 +37,7 @@
 |---|---|---|---|
 | Operations / Health | PARTIAL | `/health/live` + `/health/ready` DB/cache/realtime, non-sensitive 503, tests + SLO runbook | NO — runtime dependency suite pending |
 | Backend deployment | READY (code) | Root Render Blueprint deploys Django ASGI/Daphne from `/backend`, runs migrations before start, uses `/health/live`, production settings, `AI_ENABLED=false`, and explicit Postgres/Redis/CORS/hosts env boundaries | NO — external Render service + env values still need provisioning |
+| Realtime tenant isolation | READY (code) | Staff JWT restaurant boundary; missing/invalid/expired JWT denial; active guest-token validation; cross-restaurant staff event isolation; assigned-waiter dine-in table scope; guest table-token event isolation; delivery/pickup preserved as restaurant-wide FOH because it has no table | NO — Channels runtime suite pending |
 
 ### Cycle 42 — Table Service Quality Summary
 - READY (code-complete, runtime pending): per-session deterministic service quality summary from authoritative lifecycle timestamps.
@@ -65,3 +66,10 @@
 - READY (code): migrations run before server startup; `/health/live` is the deployment health probe.
 - READY (security): production settings, generated `SECRET_KEY`, explicit DB/Redis/CORS/hosts variables, `AI_ENABLED=false`.
 - Runtime provisioning is still external-account work; no fake Production Ready claim until the public service and regression flow pass.
+
+### Cycle 47 — Realtime Tenant Isolation Matrix
+- READY (code): valid guest sockets are now explicitly regression-tested for table-token group isolation, not only invalid/inactive token rejection.
+- READY (code): staff sockets cover cross-restaurant JWT denial/event isolation and assigned-waiter dine-in table filtering.
+- VERIFIED CONTRACT: delivery/pickup realtime remains restaurant-wide FOH because delivery sessions have no table assignment; Kitchen remains excluded from FOH delivery events.
+- AI_ENABLED=false; no external AI APIs.
+- Runtime execution remains pending a dependency-capable Django/Channels runner.
