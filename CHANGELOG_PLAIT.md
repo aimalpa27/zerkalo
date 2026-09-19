@@ -1,5 +1,16 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-20 — Cycle 51
+
+### Что изменено
+- Доведён P0 analytics fix из Cycle 50 до main.
+- Добавлен отсутствующий operations_exception_kpi в frontend DjangoSummary contract.
+- Сохранены tenant/role/realtime boundaries; AI_ENABLED=false.
+
+### Проверка
+- Предыдущий CI подтвердил 13/14 critical backend tests; единственный backend blocker был старый analytics crash.
+- Запускается новый полный CI после этого коммита.
+
 ## 2026-09-20 — Cycle 50
 
 ### Что изменено

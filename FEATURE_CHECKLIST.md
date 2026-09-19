@@ -80,3 +80,11 @@
 - FIXED (contract): frontend analytics response type now includes operational analytics sections already returned by Django.
 - SAFETY: tenant filters preserved; Guest/Waiter/Kitchen permissions unchanged; AI_ENABLED=false.
 - CI/regression rerun required before Production Ready.
+
+
+### Cycle 51 — P0 Analytics Runtime/Type Contract
+- FIXED: Cycle 50 patch is now on main; Owner Analytics uses validated from/to date scope.
+- FIXED: Analytics UI contract includes operations_exception_kpi returned by Django.
+- VERIFIED from CI #93 before patch: 13/14 critical backend tests passed; realtime tenant isolation and Kitchen least privilege passed.
+- AI_ENABLED=false; no external AI APIs.
+- Production Ready remains NO until the new CI run is green.
