@@ -29,7 +29,6 @@
 | PWA | PARTIAL | ✓ manifest + offline shell + safe update prompt | N/A | manifest | SW static cache only | transactional API bypass | ✓ | ✓ offline/update recovery | static boundary checks; runtime build via CI | N/A | NO |
 | Demo Mode | READY | Guest lifecycle | Admin confirmation | — | Waiter handoff | Kitchen board | Owner analytics | isolated mock data | mobile/desktop | no production writes | YES |
 
-
 ## Operations
 
 | Support Diagnostics | READY | Admin/Manager tenant-safe snapshot: dependencies, counts, subscription, iiko config state, warnings; no secrets/PII/raw logs | NO — Django runtime suite pending |
@@ -37,6 +36,7 @@
 | Area | Status | Coverage | Production Ready |
 |---|---|---|---|
 | Operations / Health | PARTIAL | `/health/live` + `/health/ready` DB/cache/realtime, non-sensitive 503, tests + SLO runbook | NO — runtime dependency suite pending |
+| Backend deployment | READY (code) | Root Render Blueprint deploys Django ASGI/Daphne from `/backend`, runs migrations before start, uses `/health/live`, production settings, `AI_ENABLED=false`, and explicit Postgres/Redis/CORS/hosts env boundaries | NO — external Render service + env values still need provisioning |
 
 ### Cycle 42 — Table Service Quality Summary
 - READY (code-complete, runtime pending): per-session deterministic service quality summary from authoritative lifecycle timestamps.
@@ -59,3 +59,9 @@
 - TESTS ADDED: create/list/delete, validation, Waiter/Kitchen denial, cross-tenant isolation. Runtime pending dependency-capable runner.
 - Production Ready: NO — P0 full lifecycle runtime regression still blocked by missing dependencies.
 - [x] P4 Service recovery action tracking — explicit source linkage, tenant/session guards, coverage KPI, mobile source selector (Cycle 45).
+
+### Cycle 46 — Public Backend Runtime Blueprint
+- READY (code): root `render.yaml` deploys the existing Django backend as ASGI with Daphne so HTTP + WebSocket use the same public runtime.
+- READY (code): migrations run before server startup; `/health/live` is the deployment health probe.
+- READY (security): production settings, generated `SECRET_KEY`, explicit DB/Redis/CORS/hosts variables, `AI_ENABLED=false`.
+- Runtime provisioning is still external-account work; no fake Production Ready claim until the public service and regression flow pass.
