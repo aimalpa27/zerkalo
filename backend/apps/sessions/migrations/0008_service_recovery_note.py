@@ -5,7 +5,7 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 class Migration(migrations.Migration):
-    dependencies = [('sessions','0007_operational_exception_state'),('users','0001_initial')]
+    dependencies = [('order_sessions','0007_operational_exception_state'),('users','0001_initial')]
     operations = [migrations.CreateModel(name='ServiceRecoveryNote', fields=[
         ('id',models.UUIDField(default=uuid.uuid4,editable=False,primary_key=True,serialize=False)),
         ('reason',models.CharField(choices=[('delay','Delay'),('quality','Quality'),('wrong_order','Wrong order'),('service','Service'),('payment','Payment'),('other','Other')],max_length=20)),
@@ -14,5 +14,5 @@ class Migration(migrations.Migration):
         ('created_at',models.DateTimeField(auto_now_add=True)),('updated_at',models.DateTimeField(auto_now=True)),
         ('created_by',models.ForeignKey(null=True,on_delete=django.db.models.deletion.SET_NULL,related_name='service_recoveries_created',to=settings.AUTH_USER_MODEL)),
         ('restaurant',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='service_recoveries',to='restaurants.restaurant')),
-        ('session',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='service_recoveries',to='sessions.tablesession')),
+        ('session',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='service_recoveries',to='order_sessions.tablesession')),
     ], options={'db_table':'service_recovery_notes','indexes':[models.Index(fields=['restaurant','created_at'],name='service_rec_restaur_54ab_idx'),models.Index(fields=['restaurant','reason'],name='service_rec_restaur_013e_idx')]})]
