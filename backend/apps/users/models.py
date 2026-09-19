@@ -69,6 +69,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f'{self.name} ({self.email})'
 
+    def get_full_name(self):
+        """Canonical human-readable staff name for Django-compatible call sites."""
+        return (self.name or '').strip()
+
+    def get_short_name(self):
+        return self.get_full_name()
+
     @property
     def is_admin_or_manager(self):
         return self.role in ('admin', 'manager')
