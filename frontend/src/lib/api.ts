@@ -445,6 +445,13 @@ export const api = {
       top_items: Array<{ item_name: string; total_qty: number; total_revenue: number }>
       comparison: null | { from: string; to: string; revenue: number; sessions_count: number; avg_check: number; revenue_change_pct: number | null; sessions_change_pct: number | null; avg_check_change_pct: number | null }
       operations: { active_tables: number; table_utilization_pct: number | null; avg_session_minutes: number; best_hour: null | { hour: number; sessions: number; revenue: number }; best_day: null | { weekday: number; label: string; sessions: number; revenue: number } }
+      kitchen_sla: any
+      staff_efficiency: any
+      sla_incident_trends: any
+      shift_zone_operations: any
+      daily_digest: any
+      operations_exception_kpi: any
+      service_recovery: any
       upsell: { impressions: number; adds: number; conversions: number; conversion_rate: number; add_rate: number; revenue: number; top_rules: Array<{ rule_id: string; rule__trigger_item__name: string; rule__recommended_item__name: string; conversions: number; revenue: number }> }
     }>(`/restaurants/${restId}/analytics/summary/${qs}`)
   },

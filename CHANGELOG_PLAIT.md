@@ -1,5 +1,17 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-20 — Cycle 50
+
+### Что изменено
+- Исправлен P0 crash Owner Analytics в конце полного ресторанного lifecycle: удалены undefined `start/end`.
+- Service Recovery, SLA и Operations Exception coverage теперь используют единый validated `from/to` date-window и tenant scope.
+- Frontend analytics contract синхронизирован с operational sections Django response.
+- AI_ENABLED=false; внешние AI API не подключались.
+
+### Проверка
+- Изменения минимальные и не меняют Guest/Admin/Manager/Waiter/Kitchen permission boundaries или CRUD/realtime flows.
+- После коммита требуется полный CI: backend regression + frontend typecheck/build + QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics.
+
 ## 2026-09-17 — Cycle 20
 
 ### Что изменено

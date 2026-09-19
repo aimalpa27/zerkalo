@@ -505,7 +505,11 @@ class AnalyticsSummaryView(APIView):
             'attention': attention,
         }
 
-        recovery_qs = ServiceRecoveryNote.objects.filter(restaurant_id=rest_id, created_at__gte=start, created_at__lte=end)
+        recovery_qs = ServiceRecoveryNote.objects.filter(restaurant_id=rest_id)
+        if from_date:
+            recovery_qs = recovery_qs.filter(created_at__date__gte=from_date)
+        if to_date:
+            recovery_qs = recovery_qs.filter(created_at__date__lte=to_date)
         recovery_total = recovery_qs.count()
         recovery_cost = recovery_qs.aggregate(v=Sum('compensation_amount'))['v'] or 0
         recovery_reasons = list(recovery_qs.values('reason').annotate(count=Count('id'), cost=Sum('compensation_amount')).order_by('-count', '-cost'))
@@ -549,8 +553,16 @@ class AnalyticsSummaryView(APIView):
         # Action tracking: serious operational problems are authoritative SLA
         # breaches + persisted exception lifecycles in the selected period. A
         # problem is covered only by an explicitly linked recovery note.
-        serious_sla = SLAIncident.objects.filter(restaurant_id=rest_id, breached_at__gte=start, breached_at__lte=end).count()
-        serious_exceptions = OperationalExceptionState.objects.filter(restaurant_id=rest_id, first_seen_at__gte=start, first_seen_at__lte=end).count()
+        serious_sla_qs = SLAIncident.objects.filter(restaurant_id=rest_id)
+        serious_exceptions_qs = OperationalExceptionState.objects.filter(restaurant_id=rest_id)
+        if from_date:
+            serious_sla_qs = serious_sla_qs.filter(breached_at__date__gte=from_date)
+            serious_exceptions_qs = serious_exceptions_qs.filter(first_seen_at__date__gte=from_date)
+        if to_date:
+            serious_sla_qs = serious_sla_qs.filter(breached_at__date__lte=to_date)
+            serious_exceptions_qs = serious_exceptions_qs.filter(first_seen_at__date__lte=to_date)
+        serious_sla = serious_sla_qs.count()
+        serious_exceptions = serious_exceptions_qs.count()
         serious_total = serious_sla + serious_exceptions
         linked_sla = recovery_qs.exclude(source_sla_incident_id=None).values('source_sla_incident_id').distinct().count()
         linked_exceptions = recovery_qs.exclude(source_exception_id=None).values('source_exception_id').distinct().count()

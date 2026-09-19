@@ -73,3 +73,10 @@
 - VERIFIED CONTRACT: delivery/pickup realtime remains restaurant-wide FOH because delivery sessions have no table assignment; Kitchen remains excluded from FOH delivery events.
 - AI_ENABLED=false; no external AI APIs.
 - Runtime execution remains pending a dependency-capable Django/Channels runner.
+
+
+### Cycle 50 — P0 Full Lifecycle Analytics Fix
+- FIXED (code): Owner Analytics no longer references undefined `start/end`; recovery/SLA/exception coverage uses the same validated `from/to` calendar filters as the rest of Analytics.
+- FIXED (contract): frontend analytics response type now includes operational analytics sections already returned by Django.
+- SAFETY: tenant filters preserved; Guest/Waiter/Kitchen permissions unchanged; AI_ENABLED=false.
+- CI/regression rerun required before Production Ready.
