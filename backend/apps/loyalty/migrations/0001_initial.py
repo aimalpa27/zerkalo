@@ -4,7 +4,7 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
     initial = True
-    dependencies = [('restaurants','0010_restaurant_network'), ('sessions','0003_order_confirmation_status_model')]
+    dependencies = [('restaurants','0010_restaurant_network'), ('order_sessions','0003_order_confirmation_status_model')]
     operations = [
         migrations.CreateModel(name='LoyaltyMember', fields=[
             ('id',models.UUIDField(default=uuid.uuid4,editable=False,primary_key=True,serialize=False)),
@@ -19,6 +19,6 @@ class Migration(migrations.Migration):
         migrations.CreateModel(name='LoyaltyVisit',fields=[
             ('id',models.UUIDField(default=uuid.uuid4,editable=False,primary_key=True,serialize=False)),('spend',models.DecimalField(decimal_places=2,max_digits=12)),('points_earned',models.PositiveIntegerField(default=0)),('created_at',models.DateTimeField(auto_now_add=True)),
             ('member',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='visits',to='loyalty.loyaltymember')),
-            ('session',models.OneToOneField(on_delete=django.db.models.deletion.CASCADE,related_name='loyalty_visit',to='sessions.tablesession'))],options={'db_table':'loyalty_visits'}),
+            ('session',models.OneToOneField(on_delete=django.db.models.deletion.CASCADE,related_name='loyalty_visit',to='order_sessions.tablesession'))],options={'db_table':'loyalty_visits'}),
         migrations.AddIndex(model_name='loyaltyvisit',index=models.Index(fields=['member','created_at'],name='loyalty_vis_member_idx')),
     ]
