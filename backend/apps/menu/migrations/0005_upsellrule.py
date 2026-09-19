@@ -2,6 +2,7 @@ import uuid
 from django.db import migrations, models
 import django.db.models.deletion
 
+
 class Migration(migrations.Migration):
     dependencies = [('menu', '0004_menuitem_iiko_external_id'), ('restaurants', '0001_initial')]
     operations = [
@@ -17,9 +18,24 @@ class Migration(migrations.Migration):
                 ('restaurant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upsell_rules', to='restaurants.restaurant')),
                 ('trigger_item', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upsell_triggers', to='menu.menuitem')),
             ],
-            options={'db_table':'upsell_rules','ordering':['priority','created_at']},
+            options={'db_table': 'upsell_rules', 'ordering': ['priority', 'created_at']},
         ),
-        migrations.AddConstraint(model_name='upsellrule', constraint=models.UniqueConstraint(fields=('restaurant','trigger_item','recommended_item'), name='uniq_restaurant_upsell_pair')),
-        migrations.AddConstraint(model_name='upsellrule', constraint=models.CheckConstraint(condition=~models.Q(trigger_item=models.F('recommended_item')), name='upsell_items_must_differ')),
-        migrations.AddIndex(model_name='upsellrule', index=models.Index(fields=['restaurant','is_active','priority'], name='upsell_rule_restaur_idx')),
+        migrations.AddConstraint(
+            model_name='upsellrule',
+            constraint=models.UniqueConstraint(
+                fields=('restaurant', 'trigger_item', 'recommended_item'),
+                name='uniq_restaurant_upsell_pair',
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name='upsellrule',
+            constraint=models.CheckConstraint(
+                check=~models.Q(trigger_item=models.F('recommended_item')),
+                name='upsell_items_must_differ',
+            ),
+        ),
+        migrations.AddIndex(
+            model_name='upsellrule',
+            index=models.Index(fields=['restaurant', 'is_active', 'priority'], name='upsell_rule_restaur_idx'),
+        ),
     ]
