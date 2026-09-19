@@ -28,22 +28,15 @@ class MenuItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate_category_id(self, value):
-        """Prevent cross-tenant category assignment.
-
-        ``category_id`` is writable while ``restaurant`` is injected by the
-        view. Without this check an admin of restaurant A could attach a menu
-        item to a category belonging to restaurant B by submitting its UUID.
-        That breaks tenant isolation and can leak foreign category metadata in
-        serialized menu responses.
-        """
+        """Prevent cross-tenant category assignment from a submitted UUID."""
         if value is None:
             return value
 
         view = self.context.get('view')
         rest_id = view.kwargs.get('rest_id') if view else None
-        if rest_id and str(value.restaurant_id) != str(rest_id):
+        if rest_id and not Category.objects.filter(id=value, restaurant_id=rest_id).exists():
             raise serializers.ValidationError(
-                'Категория принадлежит другому ресторану.'
+                'Категория не найдена или принадлежит другому ресторану.'
             )
         return value
 
