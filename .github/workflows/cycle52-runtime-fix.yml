@@ -15,7 +15,7 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      DJANGO_SETTINGS_MODULE: plait_backend.settings
+      DJANGO_SETTINGS_MODULE: config.settings.development
       DATABASE_URL: sqlite:///db.sqlite3
       REDIS_URL: redis://127.0.0.1:6379/0
       AI_ENABLED: 'false'
@@ -47,14 +47,14 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           road=Path('ROADMAP.md'); s=road.read_text()
-          s=s.replace('Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |','Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — dependency-capable CI is live; Cycle 52 repairs migration drift before runtime regression |')
-          s=s.replace('Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |','Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into dependency-capable CI; Cycle 52 unblocks migration/type gates |')
+          s=s.replace('Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — suite wired into CI; runtime result awaits dependency-capable runner |','Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django tests | IN PROGRESS — dependency-capable CI is live; runtime regression gate active |')
+          s=s.replace('Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into CI; runtime result awaits dependency-capable runner |','Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | IN PROGRESS — executable full flow wired into dependency-capable CI |')
           road.write_text(s)
           feat=Path('FEATURE_CHECKLIST.md'); f=feat.read_text()
-          f += '\n### Cycle 52 — P0 Runtime Gate Repair\n- Django `check` is green on dependency-capable GitHub Actions; remaining migration state drift is generated into an explicit migration instead of bypassing `makemigrations --check`.\n- Analytics UI keeps its full `DjangoSummary` contract and explicitly narrows the API result at the state boundary; no `any`, no field removal.\n- `AI_ENABLED=false`; no external AI API.\n- Production Ready remains NO until the full lifecycle/realtime regression is green.\n'
+          f += '\n### Cycle 53 — P0 Runtime Gate Settings Fix\n- Repair runner now uses the repository authoritative Django settings module `config.settings.development`, matching `manage.py` and main CI.\n- Removed the false `plait_backend.settings` import blocker; migration repair can now reach the actual model-state gate.\n- `AI_ENABLED=false`; no external AI API.\n- Production Ready remains NO until the full lifecycle/realtime regression is green.\n'
           feat.write_text(f)
           ch=Path('CHANGELOG_PLAIT.md'); c=ch.read_text()
-          entry='''## 2026-09-19 — Cycle 52\n\n### Что изменено\n- Продолжен P0 runtime gate: Django system check уже проходит на реальном CI runner.\n- Устранение migration-state drift выполняется через реальную `makemigrations`, без отключения fail-closed проверки.\n- Analytics state boundary приведён к полному локальному `DjangoSummary` contract без удаления SLA/digest/shift/service-recovery полей.\n- AI_ENABLED=false; внешние AI API не подключались.\n\n### Проверка\n- После repair-commit основной Plait CI повторно запускает `check`, `makemigrations --check`, migrations, critical restaurant regression, backend suite, frontend typecheck/build.\n\n'''
+          entry='''## 2026-09-19 — Cycle 53\n\n### Что изменено\n- Исправлен P0 CI blocker: repair workflow ссылался на несуществующий `plait_backend.settings`, хотя проект использует `config.settings.development`.\n- Runtime repair теперь совпадает с `backend/manage.py` и основным Plait CI и может выполнять реальные migrations/regression gates.\n- AI_ENABLED=false; внешние AI API не подключались.\n\n### Проверка\n- Redis и backend dependencies в предыдущем runner уже PASS; новый прогон повторяет makemigrations/check/migrate и запускает основной CI после repair commit.\n\n'''
           ch.write_text('# CHANGELOG_PLAIT.md\n\n'+entry+c.split('# CHANGELOG_PLAIT.md\n',1)[1].lstrip())
           PY
       - name: Validate Django model state after generated migration
@@ -63,11 +63,11 @@ jobs:
           python manage.py check
           python manage.py makemigrations --check --dry-run
           python manage.py migrate --noinput
-      - name: Commit Cycle 52 repair
+      - name: Commit Cycle 53 repair
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add backend frontend/src/admin/tabs/AnalyticsTab.tsx ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
           if git diff --cached --quiet; then echo 'No repair changes'; exit 0; fi
-          git commit -m 'Cycle 52: unblock P0 runtime gates'
+          git commit -m 'Cycle 53: unblock P0 runtime gates'
           git push
