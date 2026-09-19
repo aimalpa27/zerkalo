@@ -31,7 +31,7 @@ class LoyaltyVisit(models.Model):
     """Idempotent earn ledger: one closed bill can reward a member once."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     member = models.ForeignKey(LoyaltyMember, on_delete=models.CASCADE, related_name='visits')
-    session = models.OneToOneField('sessions.TableSession', on_delete=models.CASCADE, related_name='loyalty_visit')
+    session = models.OneToOneField('order_sessions.TableSession', on_delete=models.CASCADE, related_name='loyalty_visit')
     spend = models.DecimalField(max_digits=12, decimal_places=2)
     points_earned = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,7 +43,7 @@ class LoyaltyRedemption(models.Model):
     """Idempotent spend ledger: a session can consume a reward at most once."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     member = models.ForeignKey(LoyaltyMember, on_delete=models.PROTECT, related_name='redemptions')
-    session = models.OneToOneField('sessions.TableSession', on_delete=models.PROTECT, related_name='loyalty_redemption')
+    session = models.OneToOneField('order_sessions.TableSession', on_delete=models.PROTECT, related_name='loyalty_redemption')
     points_spent = models.PositiveIntegerField()
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
