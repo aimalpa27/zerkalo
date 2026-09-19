@@ -6,13 +6,6 @@ class StaffConsumer(AsyncJsonWebsocketConsumer):
     """
     ws/staff/<rest_id>/?token=<JWT>
     Receives: new_order, waiter_call, item_status_changed
-
-    FIX #1: self.group initialised to None before any auth check so that
-            disconnect() never raises AttributeError when connect() rejects early.
-    FIX #2: Authentication is now done by JWTAuthMiddleware (see middleware.py),
-            which resolves scope['user'] from the ?token= query-param.
-            The old AuthMiddlewareStack only worked with Django session cookies,
-            so staff connections were *always* rejected for JWT-auth clients.
     """
 
     async def connect(self):
@@ -42,7 +35,7 @@ class StaffConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _waiter_can_receive_table_event(self, table_id: str | None) -> bool:
-        """Scope table events for assigned waiters without changing legacy unassigned behaviour."""
+        """Scope dine-in table events for assigned waiters; preserve legacy unassigned access."""
         if self.role != 'waiter':
             return True
         user = self.scope.get('user')
@@ -72,12 +65,10 @@ class StaffConsumer(AsyncJsonWebsocketConsumer):
         await self._send_table_event('session_status_changed', event)
 
     async def delivery_status_changed(self, event):
-        # Delivery/pickup events are table-scoped too. Previously this handler
-        # bypassed _send_table_event(), so an explicitly assigned waiter could
-        # receive another table's delivery lifecycle event from the restaurant
-        # group. Missing table_id now fails closed for assigned waiters.
+        # Delivery/pickup orders intentionally have no table_id. They are
+        # restaurant-wide FOH events, not dine-in table assignment events.
         if self.role != 'kitchen':
-            await self._send_table_event('delivery_status_changed', event)
+            await self.send_json({'type': 'delivery_status_changed', 'data': event['data']})
 
     async def chat_message(self, event):
         if self.role != 'kitchen':
