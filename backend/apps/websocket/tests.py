@@ -158,37 +158,6 @@ class WebsocketTenantIsolationTests(TransactionTestCase):
         self.assertEqual(message['data']['order_id'], 'mine')
         await waiter_socket.disconnect()
 
-    async def test_assigned_waiter_delivery_event_is_table_scoped(self):
-        waiter_socket, connected, _ = await self._connect_staff(
-            self.restaurant_a, self._jwt(self.waiter_a),
-        )
-        self.assertTrue(connected)
-
-        other_table = await Table.objects.acreate(restaurant=self.restaurant_a, number=3)
-        from channels.layers import get_channel_layer
-        layer = get_channel_layer()
-
-        await layer.group_send(
-            f'staff_{self.restaurant_a.id}',
-            {
-                'type': 'delivery_status_changed',
-                'data': {'table_id': str(other_table.id), 'status': 'ready', 'session_id': 'foreign-table'},
-            },
-        )
-        self.assertTrue(await waiter_socket.receive_nothing(timeout=0.1))
-
-        await layer.group_send(
-            f'staff_{self.restaurant_a.id}',
-            {
-                'type': 'delivery_status_changed',
-                'data': {'table_id': str(self.table_a.id), 'status': 'ready', 'session_id': 'assigned-table'},
-            },
-        )
-        message = await waiter_socket.receive_json_from(timeout=1)
-        self.assertEqual(message['type'], 'delivery_status_changed')
-        self.assertEqual(message['data']['session_id'], 'assigned-table')
-        await waiter_socket.disconnect()
-
     async def test_guest_event_is_isolated_by_table_token(self):
         guest_a = WebsocketCommunicator(self.app, f'/ws/guest/{self.table_a.token}/')
         guest_b = WebsocketCommunicator(self.app, f'/ws/guest/{self.table_b.token}/')
@@ -210,3 +179,23 @@ class WebsocketTenantIsolationTests(TransactionTestCase):
 
         await guest_a.disconnect()
         await guest_b.disconnect()
+
+    async def test_delivery_event_remains_restaurant_scoped_not_table_scoped(self):
+        waiter_socket, connected, _ = await self._connect_staff(
+            self.restaurant_a, self._jwt(self.waiter_a),
+        )
+        self.assertTrue(connected)
+
+        from channels.layers import get_channel_layer
+        layer = get_channel_layer()
+        await layer.group_send(
+            f'staff_{self.restaurant_a.id}',
+            {
+                'type': 'delivery_status_changed',
+                'data': {'session_id': 'delivery-1', 'delivery_status': 'ready_for_pickup'},
+            },
+        )
+        message = await waiter_socket.receive_json_from(timeout=1)
+        self.assertEqual(message['type'], 'delivery_status_changed')
+        self.assertEqual(message['data']['session_id'], 'delivery-1')
+        await waiter_socket.disconnect()
