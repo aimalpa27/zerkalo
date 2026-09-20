@@ -455,10 +455,13 @@ class SLAIncidentTrendAnalyticsTest(APITestCase):
         self.admin = make_admin(self.restaurant)
         self.other = make_restaurant('sla-trends-other')
         self.session = make_closed_session(self.restaurant, self.table, Decimal('1000.00'))
-        now = timezone.now()
+        # Keep incidents inside the restaurant-local day even when CI runs just after UTC midnight.
+        # The previous wall-clock fixture could spill into yesterday while the request filtered today.
+        today = timezone.localdate()
+        local_noon = timezone.make_aware(datetime.datetime.combine(today, datetime.time(12, 0)))
         for idx, (station, resolved) in enumerate([('kitchen', True), ('kitchen', True), ('bar', False)]):
             item = SessionItem.objects.create(session=self.session, item_name=f'SLA {idx}', price=100, quantity=1, status='served', preparation_station=station)
-            breached = now - datetime.timedelta(hours=idx + 1)
+            breached = local_noon - datetime.timedelta(hours=idx + 1)
             SLAIncident.objects.create(restaurant=self.restaurant, item=item, kind='preparation', station=station, target_minutes=10, breached_at=breached, resolved_at=(breached + datetime.timedelta(minutes=4 + idx)) if resolved else None)
 
     def test_trends_aggregate_breaches_resolution_and_stations(self):

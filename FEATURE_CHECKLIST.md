@@ -98,3 +98,11 @@
 - FIXED: manager daily-digest no-current-shift test is timezone-independent instead of hard-coding 23:00–23:30.
 - AI_ENABLED=false; no external AI API.
 - Full 219-test suite rerun is the acceptance gate for this cleanup.
+
+
+### Cycle 56 — P0 Midnight-safe SLA Trend Regression
+- FIXED: SLA incident trend fixture now anchors incidents to restaurant-local noon instead of `timezone.now() - N hours`, so a CI run just after UTC midnight cannot move incidents outside the requested local date.
+- VERIFIED before this patch: critical restaurant regression 14/14 PASS; frontend npm ci/typecheck/build PASS; migrations/check PASS.
+- PRESERVED: Guest/Admin/Manager/Waiter/Kitchen/Owner runtime contracts, tenant isolation, payment guard and realtime permissions.
+- AI_ENABLED=false; no external AI API.
+- Acceptance gate: full 219-test backend suite + critical regression + frontend typecheck/build.

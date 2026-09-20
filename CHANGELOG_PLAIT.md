@@ -1,5 +1,16 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-20 — Cycle 56
+
+### Что изменено
+- Исправлен последний известный нестабильный P0 regression fixture SLA trends: инциденты теперь фиксируются внутри локального дня ресторана и не перескакивают на предыдущую дату около UTC-полуночи.
+- Production analytics/permissions/realtime/payment logic не ослаблялись и не менялись.
+- AI_ENABLED=false; внешние AI API не подключались.
+
+### Проверка
+- До patch: critical 14/14 PASS, frontend typecheck/build PASS, migrations/check PASS; full suite failure был воспроизводимо связан с date-boundary fixture.
+- После patch CI повторно запускает полный 219-test backend suite и frontend gate.
+
 ## 2026-09-20 — Cycle 55
 
 ### Что изменено
