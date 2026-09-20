@@ -1,0 +1,92 @@
+name: Cycle 55 P0 Full Suite Cleanup
+on:
+  push:
+    paths:
+      - '.github/workflows/cycle55-full-suite-cleanup.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      AI_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Repair stale P0 regression fixtures
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('backend/apps/sessions/tests.py')
+          s = p.read_text()
+          if 'from datetime import timedelta\n' not in s:
+              s = s.replace('from decimal import Decimal\n', 'from decimal import Decimal\nfrom datetime import timedelta\n', 1)
+
+          replacements = {
+              "User.objects.create_user(username='sla-admin', password='x', role='admin', restaurant=self.restaurant)": "User.objects.create_user(username='sla-admin', email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)",
+              "User.objects.create_user(username='sla-kitchen', password='x', role='kitchen', restaurant=self.restaurant)": "User.objects.create_user(username='sla-kitchen', email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)",
+              "User.objects.create_user(username='sla-waiter', password='x', role='waiter', restaurant=self.restaurant)": "User.objects.create_user(username='sla-waiter', email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)",
+          }
+          for old, new in replacements.items():
+              if old in s:
+                  s = s.replace(old, new, 1)
+              elif new not in s:
+                  raise SystemExit(f'missing SLA fixture: {old}')
+
+          old = "        self.client.force_authenticate(user=self.admin)\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'"
+          new = "        self.client.force_authenticate(user=self.admin)\n        # Close is intentionally guarded by the payment boundary. This test targets\n        # the close realtime broadcast, so put the fixture in the valid pre-close state.\n        self.session.status = 'awaiting_payment'\n        self.session.save(update_fields=['status'])\n        url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('close realtime fixture anchor not found')
+          p.write_text(s)
+
+          p = Path('backend/apps/analytics/tests.py')
+          s = p.read_text()
+          old = "        Shift.objects.create(restaurant=self.restaurant, staff=self.waiter, date=timezone.localdate(), start_time=datetime.time(23, 0), end_time=datetime.time(23, 30))"
+          new = "        now_local = timezone.localtime(timezone.now())\n        future_start = (now_local + datetime.timedelta(hours=2)).time().replace(tzinfo=None)\n        future_end = (now_local + datetime.timedelta(hours=3)).time().replace(tzinfo=None)\n        Shift.objects.create(restaurant=self.restaurant, staff=self.waiter, date=timezone.localdate(), start_time=future_start, end_time=future_end)"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('daily digest time fixture anchor not found')
+          p.write_text(s)
+          PY
+      - name: Update Cycle 55 docs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          road = Path('ROADMAP.md')
+          s = road.read_text()
+          s = s.replace(
+              'Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | FIXED 2026-09-20 Cycle 54 — generic IsRestaurantStaff now explicitly excludes Kitchen; kitchen remains admitted only through endpoint-specific lifecycle permission; CI rerun pending |',
+              'Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | RUNTIME PASS 2026-09-20 — generic APIs deny Kitchen; dedicated lifecycle scope preserved; critical regression 14/14 PASS |'
+          )
+          road.write_text(s)
+
+          feat = Path('FEATURE_CHECKLIST.md')
+          f = feat.read_text()
+          note = '''\n### Cycle 55 — P0 Full Backend Suite Cleanup\n- VERIFIED: critical restaurant regression remains 14/14 PASS, including QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics.\n- VERIFIED: frontend `npm ci`, typecheck and production build PASS in CI #101.\n- FIXED: SLA regression users now satisfy the current required-email auth contract.\n- FIXED: Service Recovery source tests import `timedelta` explicitly.\n- FIXED: close realtime regression now respects the required payment boundary before close.\n- FIXED: manager daily-digest no-current-shift test is timezone-independent instead of hard-coding 23:00–23:30.\n- AI_ENABLED=false; no external AI API.\n- Full 219-test suite rerun is the acceptance gate for this cleanup.\n'''
+          if '### Cycle 55 — P0 Full Backend Suite Cleanup' not in f:
+              f += note
+          feat.write_text(f)
+
+          ch = Path('CHANGELOG_PLAIT.md')
+          c = ch.read_text()
+          entry = '''## 2026-09-20 — Cycle 55\n\n### Что изменено\n- Приведены устаревшие regression fixtures к текущим production contracts без ослабления runtime-логики.\n- SLA users получают обязательные email; Service Recovery tests явно импортируют timedelta.\n- Realtime close test теперь закрывает только awaiting_payment session, сохраняя payment guard.\n- Daily Digest test больше не зависит от часа запуска CI.\n- AI_ENABLED=false; внешние AI API не подключались.\n\n### Проверка\n- До исправления CI #101: critical 14/14 PASS, frontend typecheck/build PASS; full suite 219 tests имел 1 failure + 7 fixture/time errors.\n- После коммита основной CI повторно проверит migrations, critical flow и полный backend suite.\n\n'''
+          if '## 2026-09-20 — Cycle 55' not in c:
+              c = '# CHANGELOG_PLAIT.md\n\n' + entry + c.split('# CHANGELOG_PLAIT.md\n', 1)[1].lstrip()
+          ch.write_text(c)
+          PY
+      - name: Static syntax validation
+        run: |
+          python -m py_compile backend/apps/sessions/tests.py backend/apps/analytics/tests.py
+      - name: Commit cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/apps/sessions/tests.py backend/apps/analytics/tests.py ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
+          if git diff --cached --quiet; then echo 'No cleanup changes'; exit 0; fi
+          git commit -m 'Cycle 55: clean P0 full-suite regressions'
+          git push
