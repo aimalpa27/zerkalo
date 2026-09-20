@@ -106,3 +106,12 @@
 - PRESERVED: Guest/Admin/Manager/Waiter/Kitchen/Owner runtime contracts, tenant isolation, payment guard and realtime permissions.
 - AI_ENABLED=false; no external AI API.
 - Acceptance gate: full 219-test backend suite + critical regression + frontend typecheck/build.
+
+
+### Cycle 57 — P0 Full-suite Model Contract Cleanup
+- FIXED: SLA incident fixtures use the current email-based custom User contract; removed obsolete `username` arguments and added the missing foreign-user email.
+- FIXED: Service Recovery source fixtures use the current SessionItem `price` field instead of obsolete `unit_price`.
+- PRESERVED: production Guest/Admin/Manager/Waiter/Kitchen/Owner behavior, tenant isolation, realtime and payment guards are unchanged.
+- VERIFIED before patch: critical restaurant regression 14/14 PASS; frontend typecheck/build PASS; migrations/check PASS.
+- AI_ENABLED=false; no external AI API.
+- Acceptance gate: full 219-test backend suite + critical regression + frontend typecheck/build on this commit.

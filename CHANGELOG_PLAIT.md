@@ -1,5 +1,15 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-20 — Cycle 57
+
+### Что изменено
+- Исправлены оставшиеся устаревшие P0 test fixtures без изменения production-логики: SLA tests переведены на email-based User contract, Service Recovery source tests — на актуальное поле SessionItem.price.
+- Сохранены permissions, tenant isolation, realtime, payment boundary и AI_ENABLED=false.
+
+### Проверка
+- До patch: critical regression 14/14 PASS, frontend typecheck/build PASS, migrations/check PASS; full suite падал на obsolete fixture arguments.
+- После patch acceptance gate: полный 219-test backend suite + critical regression + frontend typecheck/build.
+
 ## 2026-09-20 — Cycle 56
 
 ### Что изменено

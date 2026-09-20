@@ -744,9 +744,9 @@ class SLAIncidentTests(APITestCase):
         from apps.users.models import User
         self.restaurant = Restaurant.objects.create(name='SLA Cafe', slug='sla-cafe', kitchen_sla_minutes=10, bar_sla_minutes=5, ready_to_served_sla_minutes=3)
         self.table = Table.objects.create(restaurant=self.restaurant, number=7)
-        self.admin = User.objects.create_user(username='sla-admin', email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)
-        self.kitchen = User.objects.create_user(username='sla-kitchen', email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)
-        self.waiter = User.objects.create_user(username='sla-waiter', email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)
+        self.admin = User.objects.create_user(email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)
+        self.kitchen = User.objects.create_user(email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)
+        self.waiter = User.objects.create_user(email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)
         self.session = TableSession.objects.create(restaurant=self.restaurant, table=self.table, table_number=7, table_token='sla-token', status='open')
 
     def _url(self): return f'/api/v1/restaurants/{self.restaurant.id}/sla-incidents/'
@@ -781,7 +781,7 @@ class SLAIncidentTests(APITestCase):
         from apps.restaurants.models import Restaurant
         from apps.users.models import User
         other = Restaurant.objects.create(name='Other', slug='sla-other')
-        foreign = User.objects.create_user(username='sla-foreign', password='x', role='admin', restaurant=other)
+        foreign = User.objects.create_user(email='sla-foreign@example.com', password='x', role='admin', restaurant=other)
         self.client.force_authenticate(foreign)
         self.assertEqual(self.client.get(self._url()).status_code, 403)
 
@@ -942,7 +942,7 @@ class ServiceRecoverySourceTrackingTests(APITestCase):
         self.restaurant=make_restaurant('recovery-source'); self.table=make_table(self.restaurant,9)
         self.session=TableSession.objects.create(restaurant=self.restaurant,table=self.table,table_number=9,table_token=self.table.token)
         self.manager=make_staff(self.restaurant,'manager')
-        self.item=SessionItem.objects.create(session=self.session,item_name='Soup',unit_price=1000,quantity=1,status='confirmed',confirmed_at=timezone.now()-timedelta(minutes=20))
+        self.item=SessionItem.objects.create(session=self.session,item_name='Soup',price=1000,quantity=1,status='confirmed',confirmed_at=timezone.now()-timedelta(minutes=20))
         self.incident=SLAIncident.objects.create(restaurant=self.restaurant,item=self.item,kind='preparation',station='kitchen',target_minutes=10,breached_at=timezone.now()-timedelta(minutes=10))
         self.client.force_authenticate(self.manager)
         self.url=f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/service-recoveries/'
@@ -951,7 +951,7 @@ class ServiceRecoverySourceTrackingTests(APITestCase):
         self.assertEqual(r.status_code,201); self.assertEqual(r.data['source_type'],'sla'); self.assertEqual(r.data['source_id'],str(self.incident.id))
     def test_recovery_rejects_sla_from_other_session(self):
         other=TableSession.objects.create(restaurant=self.restaurant,table=self.table,table_number=9,table_token=self.table.token)
-        item=SessionItem.objects.create(session=other,item_name='Tea',unit_price=500,quantity=1,status='confirmed')
+        item=SessionItem.objects.create(session=other,item_name='Tea',price=500,quantity=1,status='confirmed')
         inc=SLAIncident.objects.create(restaurant=self.restaurant,item=item,kind='preparation',station='kitchen',target_minutes=10,breached_at=timezone.now())
         r=self.client.post(self.url,{'reason':'delay','note':'x','source_type':'sla','source_id':str(inc.id)},format='json')
         self.assertEqual(r.status_code,404)
