@@ -1,0 +1,54 @@
+name: Cycle 56 Final P0 Suite Repair
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cycle56-final-p0-suite.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply deterministic midnight-safe regression repair
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('backend/apps/analytics/tests.py')
+          text = path.read_text()
+          old = """        now = timezone.now()\n        for idx, (station, resolved) in enumerate([('kitchen', True), ('kitchen', True), ('bar', False)]):\n            item = SessionItem.objects.create(session=self.session, item_name=f'SLA {idx}', price=100, quantity=1, status='served', preparation_station=station)\n            breached = now - datetime.timedelta(hours=idx + 1)\n"""
+          new = """        # Keep incidents inside the restaurant-local day even when CI runs just after UTC midnight.\n        # The previous wall-clock fixture could spill into yesterday while the request filtered today.\n        today = timezone.localdate()\n        local_noon = timezone.make_aware(datetime.datetime.combine(today, datetime.time(12, 0)))\n        for idx, (station, resolved) in enumerate([('kitchen', True), ('kitchen', True), ('bar', False)]):\n            item = SessionItem.objects.create(session=self.session, item_name=f'SLA {idx}', price=100, quantity=1, status='served', preparation_station=station)\n            breached = local_noon - datetime.timedelta(hours=idx + 1)\n"""
+          if old not in text:
+              raise SystemExit('Expected SLA trend fixture not found; refusing unsafe edit')
+          path.write_text(text.replace(old, new, 1))
+
+          roadmap = Path('ROADMAP.md')
+          r = roadmap.read_text()
+          r = r.replace(
+              'RUNTIME PASS 2026-09-20 — 14/14 critical regression tests pass QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics; full 219-test suite cleanup remains',
+              'RUNTIME PASS 2026-09-20 — 14/14 critical regression tests pass QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics; Cycle 56 removes the final midnight-sensitive full-suite fixture'
+          )
+          roadmap.write_text(r)
+
+          checklist = Path('FEATURE_CHECKLIST.md')
+          c = checklist.read_text()
+          c += """\n\n### Cycle 56 — P0 Midnight-safe SLA Trend Regression\n- FIXED: SLA incident trend fixture now anchors incidents to restaurant-local noon instead of `timezone.now() - N hours`, so a CI run just after UTC midnight cannot move incidents outside the requested local date.\n- VERIFIED before this patch: critical restaurant regression 14/14 PASS; frontend npm ci/typecheck/build PASS; migrations/check PASS.\n- PRESERVED: Guest/Admin/Manager/Waiter/Kitchen/Owner runtime contracts, tenant isolation, payment guard and realtime permissions.\n- AI_ENABLED=false; no external AI API.\n- Acceptance gate: full 219-test backend suite + critical regression + frontend typecheck/build.\n"""
+          checklist.write_text(c)
+
+          changelog = Path('CHANGELOG_PLAIT.md')
+          ch = changelog.read_text()
+          entry = """## 2026-09-20 — Cycle 56\n\n### Что изменено\n- Исправлен последний известный нестабильный P0 regression fixture SLA trends: инциденты теперь фиксируются внутри локального дня ресторана и не перескакивают на предыдущую дату около UTC-полуночи.\n- Production analytics/permissions/realtime/payment logic не ослаблялись и не менялись.\n- AI_ENABLED=false; внешние AI API не подключались.\n\n### Проверка\n- До patch: critical 14/14 PASS, frontend typecheck/build PASS, migrations/check PASS; full suite failure был воспроизводимо связан с date-boundary fixture.\n- После patch CI повторно запускает полный 219-test backend suite и frontend gate.\n\n"""
+          changelog.write_text(ch.replace('# CHANGELOG_PLAIT.md\n\n', '# CHANGELOG_PLAIT.md\n\n' + entry, 1))
+      - name: Commit repair
+        run: |
+          git config user.name "plait-ci"
+          git config user.email "plait-ci@users.noreply.github.com"
+          git add backend/apps/analytics/tests.py ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
+          git commit -m "test: make SLA trend regression midnight-safe"
+          git push
