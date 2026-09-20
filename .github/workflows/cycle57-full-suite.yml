@@ -1,0 +1,65 @@
+name: Cycle 57 Full Suite Contract Cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cycle57-full-suite.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair stale regression fixtures and record cycle
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('backend/apps/sessions/tests.py')
+          s = p.read_text()
+          replacements = {
+            "User.objects.create_user(username='sla-admin', email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)": "User.objects.create_user(email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)",
+            "User.objects.create_user(username='sla-kitchen', email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)": "User.objects.create_user(email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)",
+            "User.objects.create_user(username='sla-waiter', email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)": "User.objects.create_user(email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)",
+            "User.objects.create_user(username='sla-foreign', password='x', role='admin', restaurant=other)": "User.objects.create_user(email='sla-foreign@example.com', password='x', role='admin', restaurant=other)",
+            "item_name='Soup',unit_price=1000": "item_name='Soup',price=1000",
+            "item_name='Tea',unit_price=500": "item_name='Tea',price=500",
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Expected fixture fragment missing: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+
+          roadmap = Path('ROADMAP.md')
+          r = roadmap.read_text()
+          r = r.replace(
+              'RUNTIME PASS 2026-09-20 — 14/14 critical regression tests pass QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics; Cycle 56 removes the final midnight-sensitive full-suite fixture',
+              'RUNTIME PASS 2026-09-20 — 14/14 critical regression tests pass QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics; Cycle 57 aligns remaining stale full-suite fixtures with current User/SessionItem contracts; full-suite rerun pending'
+          )
+          roadmap.write_text(r)
+
+          checklist = Path('FEATURE_CHECKLIST.md')
+          c = checklist.read_text()
+          c += '''\n\n### Cycle 57 — P0 Full-suite Model Contract Cleanup\n- FIXED: SLA incident fixtures use the current email-based custom User contract; removed obsolete `username` arguments and added the missing foreign-user email.\n- FIXED: Service Recovery source fixtures use the current SessionItem `price` field instead of obsolete `unit_price`.\n- PRESERVED: production Guest/Admin/Manager/Waiter/Kitchen/Owner behavior, tenant isolation, realtime and payment guards are unchanged.\n- VERIFIED before patch: critical restaurant regression 14/14 PASS; frontend typecheck/build PASS; migrations/check PASS.\n- AI_ENABLED=false; no external AI API.\n- Acceptance gate: full 219-test backend suite + critical regression + frontend typecheck/build on this commit.\n'''
+          checklist.write_text(c)
+
+          changelog = Path('CHANGELOG_PLAIT.md')
+          ch = changelog.read_text()
+          entry = '''# CHANGELOG_PLAIT.md\n\n## 2026-09-20 — Cycle 57\n\n### Что изменено\n- Исправлены оставшиеся устаревшие P0 test fixtures без изменения production-логики: SLA tests переведены на email-based User contract, Service Recovery source tests — на актуальное поле SessionItem.price.\n- Сохранены permissions, tenant isolation, realtime, payment boundary и AI_ENABLED=false.\n\n### Проверка\n- До patch: critical regression 14/14 PASS, frontend typecheck/build PASS, migrations/check PASS; full suite падал на obsolete fixture arguments.\n- После patch acceptance gate: полный 219-test backend suite + critical regression + frontend typecheck/build.\n\n'''
+          if ch.startswith('# CHANGELOG_PLAIT.md\n'):
+              ch = entry + ch[len('# CHANGELOG_PLAIT.md\n\n'):]
+          else:
+              ch = entry + ch
+          changelog.write_text(ch)
+          PY
+          git config user.name "plait-cycle-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/apps/sessions/tests.py ROADMAP.md FEATURE_CHECKLIST.md CHANGELOG_PLAIT.md
+          git commit -m "test: align P0 suite fixtures with current models"
+          git push
