@@ -578,7 +578,10 @@ class ManagerDailyDigestTest(APITestCase):
         Shift.objects.filter(restaurant=self.restaurant).delete()
         import datetime
         from django.utils import timezone
-        Shift.objects.create(restaurant=self.restaurant, staff=self.waiter, date=timezone.localdate(), start_time=datetime.time(23, 0), end_time=datetime.time(23, 30))
+        now_local = timezone.localtime(timezone.now())
+        future_start = (now_local + datetime.timedelta(hours=2)).time().replace(tzinfo=None)
+        future_end = (now_local + datetime.timedelta(hours=3)).time().replace(tzinfo=None)
+        Shift.objects.create(restaurant=self.restaurant, staff=self.waiter, date=timezone.localdate(), start_time=future_start, end_time=future_end)
         self.incident.resolved_at = timezone.now()
         self.incident.save(update_fields=['resolved_at'])
         self.client.force_authenticate(self.manager)

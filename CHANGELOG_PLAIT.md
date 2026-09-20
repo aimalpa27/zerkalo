@@ -1,5 +1,18 @@
 # CHANGELOG_PLAIT.md
 
+## 2026-09-20 — Cycle 55
+
+### Что изменено
+- Приведены устаревшие regression fixtures к текущим production contracts без ослабления runtime-логики.
+- SLA users получают обязательные email; Service Recovery tests явно импортируют timedelta.
+- Realtime close test теперь закрывает только awaiting_payment session, сохраняя payment guard.
+- Daily Digest test больше не зависит от часа запуска CI.
+- AI_ENABLED=false; внешние AI API не подключались.
+
+### Проверка
+- До исправления CI #101: critical 14/14 PASS, frontend typecheck/build PASS; full suite 219 tests имел 1 failure + 7 fixture/time errors.
+- После коммита основной CI повторно проверит migrations, critical flow и полный backend suite.
+
 ## 2026-09-20 — Cycle 51
 
 ### Что изменено

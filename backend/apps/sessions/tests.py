@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import timedelta
 
 from django.test import TestCase
 from django.utils import timezone
@@ -428,6 +429,10 @@ class SessionRealtimeNotificationTest(APITestCase):
         from unittest.mock import patch
 
         self.client.force_authenticate(user=self.admin)
+        # Close is intentionally guarded by the payment boundary. This test targets
+        # the close realtime broadcast, so put the fixture in the valid pre-close state.
+        self.session.status = 'awaiting_payment'
+        self.session.save(update_fields=['status'])
         url = f'/api/v1/restaurants/{self.restaurant.id}/sessions/{self.session.id}/close/'
         with patch('apps.websocket.events.notify_session_status') as notify:
             response = self.client.post(url, {'payment_method': 'cash'})
@@ -739,9 +744,9 @@ class SLAIncidentTests(APITestCase):
         from apps.users.models import User
         self.restaurant = Restaurant.objects.create(name='SLA Cafe', slug='sla-cafe', kitchen_sla_minutes=10, bar_sla_minutes=5, ready_to_served_sla_minutes=3)
         self.table = Table.objects.create(restaurant=self.restaurant, number=7)
-        self.admin = User.objects.create_user(username='sla-admin', password='x', role='admin', restaurant=self.restaurant)
-        self.kitchen = User.objects.create_user(username='sla-kitchen', password='x', role='kitchen', restaurant=self.restaurant)
-        self.waiter = User.objects.create_user(username='sla-waiter', password='x', role='waiter', restaurant=self.restaurant)
+        self.admin = User.objects.create_user(username='sla-admin', email='sla-admin@example.com', password='x', role='admin', restaurant=self.restaurant)
+        self.kitchen = User.objects.create_user(username='sla-kitchen', email='sla-kitchen@example.com', password='x', role='kitchen', restaurant=self.restaurant)
+        self.waiter = User.objects.create_user(username='sla-waiter', email='sla-waiter@example.com', password='x', role='waiter', restaurant=self.restaurant)
         self.session = TableSession.objects.create(restaurant=self.restaurant, table=self.table, table_number=7, table_token='sla-token', status='open')
 
     def _url(self): return f'/api/v1/restaurants/{self.restaurant.id}/sla-incidents/'
