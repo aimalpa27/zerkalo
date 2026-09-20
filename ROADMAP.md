@@ -6,9 +6,9 @@
 |---|---|---:|---:|---:|---|---|
 | Direct QR auto-connect | P0 | Critical | S | 1–2h | guest endpoint | DONE 2026-09-16 |
 | Reproducible frontend/backend CI | P0 | Critical | M | 0.5–1d | registry/network/CI | DONE 2026-09-17 — GitHub Actions + local verify script |
-| Backend public runtime / ASGI deployment | P0 | Critical | M | 0.5d | Render + Postgres + Redis | CODE READY 2026-09-19 — root Render Blueprint, production settings, migrations, ASGI/Daphne, liveness probe; external account/env provisioning pending |
+| Backend public runtime / ASGI deployment | P0 | Critical | M | 0.5d | public host + Postgres + Redis | CODE READY 2026-09-20 — Render Blueprint/ASGI/Daphne/health probes ready; Railway provisioning attempted Cycle 59 but account trial is expired, so external paid runtime provisioning is the only remaining P0 blocker |
 | Tenant isolation regression suite | P0 | Critical | M | 0.5–1d | Django/Channels tests | RUNTIME PASS 2026-09-20 — staff JWT restaurant boundary + invalid/expired JWT + inactive/unknown guest token + cross-restaurant event isolation + assigned-waiter table scope + guest table-token isolation |
-| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | VERIFYING CYCLE 58 — 14/14 critical regression already PASS; current main includes Cycle 55–57 fixture/model-contract repairs; final full-suite CI triggered on current main |
+| Full order lifecycle regression | P0 | Critical | L | 1–2d | runtime deps | RUNTIME PASS 2026-09-20 — CI #108: critical 14/14 PASS + full backend 219/219 PASS; QR→menu→cart→order→admin→kitchen→ready→waiter→served→close→analytics verified |
 | Kitchen least-privilege role | P0 | Critical | M | 0.5–1d | users/sessions/realtime | RUNTIME PASS 2026-09-20 — generic APIs deny Kitchen; dedicated lifecycle scope preserved; critical regression 14/14 PASS |
 | Realtime reconnect/status propagation | P0 | Critical | M | 0.5–1d | Redis/Channels | RUNTIME PASS (critical matrix) 2026-09-20 — status broadcast + JWT refresh/backoff + assigned-waiter realtime/API table scope + communicator tenant/table isolation matrix |
 | Error/loading/empty state audit | P1 | High | M | 1d | core screens | DONE 2026-09-17 — Kitchen Cycle 13; Admin Sessions/Calls/Analytics Cycle 14; Guest Restaurant/Table/Menu/Cart/Checkout recovery + cart draft persistence Cycle 15 |
